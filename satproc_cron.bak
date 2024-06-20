@@ -1,0 +1,2 @@
+*/5 * * * * /home/stewells/AfricaNowcasting/rt_code/run_satproc.sh >>/home/stewells/AfricaNowcasting/logs/run_satproc_cronlog.log 2>&1
+
