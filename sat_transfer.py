@@ -197,7 +197,7 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline):
     feed = 'eumdat'
     ukceh_mirror=False
     make_gif=False
-    overwrite = True
+    overwrite = False
     ######### shadow run options #######################
     #run shadow run can be set to run 15-minutes behind the main run for contingency against machine problems
 	
@@ -239,7 +239,7 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline):
         else:
             pass
         sfile =use_file[:-3]+'_eumdat.nc' if  feed=='eumdat' else use_file
-        print(sfile)
+        #print(sfile)
 # if file already in saved folder assume processed and exit function for this file
         
  
@@ -254,7 +254,7 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline):
 
         vis_file = 'VIS_006_rad_'+use_year+use_month+use_day+'_'+use_time+'.nc'
         sfile = vis_file[:-3]+'_eumdat.nc' if  feed=='eumdat' else vis_file
-        print(vis_file)
+        #print(vis_file)
         if os.path.exists(os.path.join(mirror_path,vis_file)):# visible channel exists, so copy it too
             if not os.path.exists(os.path.join(savedir,sfile)):
                 shutil.copy2(os.path.join(mirror_path,vis_file),os.path.join(savedir,sfile))            

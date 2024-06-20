@@ -63,6 +63,12 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     do_point_timeseries = True
     do_geotiff = True
     output_site_cores=True
+
+   # OPTIMISATION OPTIONS
+    opt_geotiff = True
+    opt_geotiff_float32=True
+    opt_geotiff_ndpls = 2
+
 	
    # version_maj = Main product version
    # version_min = LMF on = 2, LMF off = 1, Testing/non official version = 0
@@ -407,9 +413,9 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 
 
 # weights for the full domain 
-    if os.path.exists('weights_data_ex.npz'):
+    if os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_data_ex.npz'):
         print("reading npz weights")
-        weightdata = np.load('weights_data_ex.npz')
+        weightdata = np.load('/home/stewells/AfricaNowcasting/rt_code/weights_data_ex.npz')
         inds = weightdata['inds_ex']
         weights= weightdata['weights_ex']
         new_shape=tuple(weightdata['new_shape_ex'])
@@ -417,14 +423,14 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     else: # need to make it   
         print("creating weights")
         inds, weights, new_shape=uinterp.interpolation_weights(lons_mid[np.isfinite(lons_mid)], lats_mid[np.isfinite(lats_mid)],blobs_lons, blobs_lats, irregular_1d=True)
-        np.savez('weights_data_ex.npz',inds_ex=inds,weights=weights,new_shape=np.array(new_shape))
+        np.savez('/home/stewells/AfricaNowcasting/rt_code/weights_data_ex.npz',inds_ex=inds,weights=weights,new_shape=np.array(new_shape))
 
-    print(os.path.exists('weights_2_data_ex_a.npz'))
+    print(os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_2_data_ex_a.npz'))
 # return journey...
-    if os.path.exists('weights_2_data_ex_a.npz'):
+    if os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_2_data_ex_a.npz'):
         #print(
         print("reading npz weights 2")
-        weight2data = np.load('weights_2_data_ex_a.npz')
+        weight2data = np.load('/home/stewells/AfricaNowcasting/rt_code/weights_2_data_ex_a.npz')
         inds_2 = weight2data['inds_2_ex']
         weights_2= weight2data['weights_2_ex']
         new_shape_2=tuple(weight2data['new_shape_2_ex'])
@@ -432,34 +438,34 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     else: # need to make it   
         print("creating weights 2")
         inds_2, weights_2, new_shape_2=uinterp.interpolation_weights(blobs_lons[np.isfinite(blobs_lons)], blobs_lats[np.isfinite(blobs_lats)], lons_mid, lats_mid)
-        np.savez('weights_2_data_ex_a.npz',inds_2_ex=inds_2,weights_2_ex=weights_2,new_shape_2_ex=np.array(new_shape_2))
+        np.savez('/home/stewells/AfricaNowcasting/rt_code/weights_2_data_ex_a.npz',inds_2_ex=inds_2,weights_2_ex=weights_2,new_shape_2_ex=np.array(new_shape_2))
 			
 			
     # visual radiation only need one-way to project onto constant pixel grid
-    if os.path.exists('weights_ssa_3km.npz'):
+    if os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_ssa_3km.npz'):
         print("reading npz 3km weights")
-        weightdata3km = np.load('weights_ssa_3km.npz')
+        weightdata3km = np.load('/home/stewells/AfricaNowcasting/rt_code/weights_ssa_3km.npz')
         inds_3km = weightdata3km['inds_3km']
         weights_3km = weightdata3km['weights_3km']
         new_shape_3km = tuple(weightdata3km['new_shape_3km'])
     else: #nned to make it
         print("creating weights 3km")
         inds_3km, weights_3km, new_shape_3km=uinterp.interpolation_weights( lons_mid, lats_mid,blobs_lons_3km, blobs_lats_3km)
-        np.savez('weights_ssa_3km.npz',inds_3km=inds_3km,weights_3km=weights_3km,new_shape_3km=np.array(new_shape_3km))
+        np.savez('/home/stewells/AfricaNowcasting/rt_code/weights_ssa_3km.npz',inds_3km=inds_3km,weights_3km=weights_3km,new_shape_3km=np.array(new_shape_3km))
 
 # weights for the subdomain (only need in one direction for geotiff conversion)
     weightdata_sub, inds_sub, weights_sub, new_shape_sub = {},{},{},{}
 
     for dom in do_full_nowcast:
-        if os.path.exists('weights_'+dom+'_v2.npz'):
-            weightdata_sub = np.load('weights_'+dom+'_v2.npz')
+        if os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_'+dom+'_v2.npz'):
+            weightdata_sub = np.load('/home/stewells/AfricaNowcasting/rt_code/weights_'+dom+'_v2.npz')
             inds_sub[dom] = weightdata_sub['inds']
             weights_sub[dom]= weightdata_sub['weights']
             new_shape_sub[dom]=tuple(weightdata_sub['new_shape'])      
         else: # need to make it
             print("creating weights for subdomain "+dom)
             inds_sub[dom], weights_sub[dom], new_shape_sub[dom]=uinterp.interpolation_weights(lons_mid_sub[dom][np.isfinite(lons_mid_sub[dom])], lats_mid_sub[dom][np.isfinite(lats_mid_sub[dom])],blobs_lons_sub[dom], blobs_lats_sub[dom], irregular_1d=True)
-            np.savez('weights_'+dom+'_v2.npz',inds=inds_sub[dom],weights=weights_sub[dom],new_shape=np.array(new_shape_sub[dom]))
+            np.savez('/home/stewells/AfricaNowcasting/rt_code/weights_'+dom+'_v2.npz',inds=inds_sub[dom],weights=weights_sub[dom],new_shape=np.array(new_shape_sub[dom]))
     
     #identify convectiv structures for real time image
     ###inds, weights, new_shape=uinterp.interpolation_weights( lons_mid, lats_mid,blobs_lons, blobs_lats)
@@ -565,6 +571,15 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         rasPath_3857 = get_portal_outpath('CTT',tnow)+"/Observed_CTT_"+tnow+"_extended_3857.tif"
 
         data_interp = uinterp.interpolate_data(data_all_keep, inds, weights, new_shape) # interpolate onto constant grid for geotiff
+
+        if  opt_geotiff:                  
+            if opt_geotiff_float32:
+                data_interp = data_interp.astype(np.float32)
+            if opt_geotiff_ndpls >=0:
+                data_interp = np.round(data_interp,opt_geotiff_ndpls)
+
+
+
         make_geoTiff([data_interp],rasPath,reprojFile=rasPath_3857,extended=True,v_maj=version_maj['full'],v_min=version_min['full'],v_submin=version_submin['full'],trim=True)
         os.system('rm '+rasPath)
         # 2. visible channel
@@ -582,6 +597,12 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
             xx= data_interp_vis.astype(float)
             xx_shifted = xx -np.nanmin(xx)
             yy= xx_shifted*100/max(np.nanmax(xx_shifted),0.000001)
+            if  opt_geotiff:                  
+                if opt_geotiff_float32:
+                    yy = yy.astype(np.float32)
+                if opt_geotiff_ndpls >=0:
+                    yy = np.round(yy,opt_geotiff_ndpls)
+
             make_geoTiff([yy],rasPath,reprojFile=rasPath_3857,extended=True,is_vis=True,v_maj=version_maj['full'],v_min=version_min['full'],v_submin=version_submin['full'],trim=True)
             os.system('rm '+rasPath)
         # 3. Convective structures
@@ -617,15 +638,16 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         scratchRoot = '/'.join(scratchdir.split('/')[:4])
         #scratchRoot = scratchdir
         for core_time in list(use_core_times):        
-            scratchdir_cs=os.path.join(scratchRoot,str(core_time.year),str(core_time.month).zfill(2),\
+            scratchdir_cs=os.path.join(scratchRoot,'nflics_current',str(core_time.year),str(core_time.month).zfill(2),\
                        str(core_time.day).zfill(2),str(core_time.hour).zfill(2)+str(core_time.minute).zfill(2))
+            #print(scratchdir_cs)
             scratchfile=scratchdir_cs+"/Convective_struct_extended_"+str(core_time).replace("-"," ").replace(":","").replace(" ","")[:-2]+"_000.nc"
             #print(scratchfile)
             #print(scratchfile)
 
 
             if os.path.exists(scratchfile):      
-                          
+                #print("FOUND")         
                 core_ds=xr.open_dataset(scratchfile)   
                 past_cores.append(core_ds["cores"].data)
                 #print(np.nanmax(core_ds["cores"].data))
@@ -655,12 +677,13 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
            # print([sob.shape,allPastCores.shape])
             allPastCores[sob==1] = (icore+1)/4.  # number of minutes, since this is plotting every half hour
         #shift onto the same grid as the ConStruct grid
-        get_portal_outpath('ConStruct',tnow)
+        #get_portal_outpath('ConStruct',tnow)
         #rasPath = geotiff_outpath+"/PastCores_"+tnow+".tif"
         #rasPath_3857 = geotiff_outpath+"/PastCores_"+tnow+"_3857.tif"
         rasPath = get_portal_outpath('PastCores',tnow)+"/PastCores_"+tnow+".tif"
         rasPath_3857 = get_portal_outpath('PastCores',tnow)+"/PastCores_"+tnow+"_3857.tif"
-
+        print("PASTCORES")
+        print(rasPath_3857)
         make_geoTiff([allPastCores],rasPath,reprojFile=rasPath_3857,extended=True,v_maj=version_maj['full'],v_min=version_min['full'],v_submin=version_submin['full'],trim=True)    
         os.system('rm '+rasPath)   
 
@@ -1214,8 +1237,17 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 
                         #rasPath = geotiff_outpath+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+dom_suffix[domain]+".tif"
                         #rasPath_3857 = geotiff_outpath+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+"_3857"+dom_suffix[domain]+".tif"
-                        rasPath = get_portal_outpath('PastCores',tnow)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+dom_suffix[domain]+".tif"
-                        rasPath_3857 = get_portal_outpath('PastCores',tnow)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+"_3857"+dom_suffix[domain]+".tif"
+                        rasPath = get_portal_outpath('Nowcast',tnow)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+dom_suffix[domain]+".tif"
+                        rasPath_3857 = get_portal_outpath('Nowcast',tnow)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+"_3857"+dom_suffix[domain]+".tif"
+
+
+                        if  opt_geotiff:                  
+                            if opt_geotiff_float32:
+                                dat_rect_geotiff_interp_grid = dat_rect_geotiff_interp_grid.astype(np.float32)
+                            if opt_geotiff_ndpls >=0:
+                                dat_rect_geotiff_interp_grid = np.round(dat_rect_geotiff_interp_grid,opt_geotiff_ndpls)
+
+
 
                         make_geoTiff([dat_rect_geotiff_interp_grid],rasPath,reprojFile=rasPath_3857,doReproj=False,is_nowcast=True,subdomain=domain,v_maj=version_maj[domain],v_min=version_min[domain],v_submin=version_submin[domain])
                         if do_point_timeseries and len(pt_locn_names[domain])>0:
@@ -1328,6 +1360,17 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
                     pass
             else:
                 print("no rect to process")
+                # make a dummy file
+                try:
+                    dummy_arr = np.ones((2,2))*-9999
+                    for use_time,i_search in zip(use_times,t_searches):  
+                        rasPath = get_portal_outpath('Nowcast',tnow)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+dom_suffix[domain]+".tif"
+                        rasPath_3857 = get_portal_outpath('Nowcast',tnow)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+"_3857"+dom_suffix[domain]+".tif"
+                        make_geoTiff([dummy_arr],rasPath,reprojFile=rasPath_3857,doReproj=False,is_nowcast=True,subdomain=domain,v_maj=version_maj[domain],v_min=version_min[domain],v_submin=version_submin[domain])
+                except Exception as e:
+                    print(e)  
+
+
                 pass
             print(['DO RISK',do_risk])
             if do_risk==1 and do_risk_subdomain[domain]:   
