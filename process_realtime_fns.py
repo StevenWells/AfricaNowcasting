@@ -275,9 +275,9 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 
     elif feed=="eumdat":
         rt_file=rt_dir+"/IR_108_BT_"+tnow[:8]+"_"+tnow[-4:]+".nc"
-        print([rt_file,'SS'])
+
         rt_lats,rt_lons,data_all=get_rt_data(rt_file,ftype='ir108_bt',haslatlon=False)
-        print(["HERE",data_all.shape])
+
         if do_extended_core_calcs:
             rt_lats_ex = np.copy(rt_lats)
             rt_lons_ex = np.copy(rt_lons)
@@ -303,7 +303,7 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 
             else:    
                 data_all_vis = np.zeros(data_all.shape)*np.nan		
-        print([rt_vis_lons.shape,data_all_vis.shape])
+        #print([rt_vis_lons.shape,data_all_vis.shape])
 
     elif feed=="ncas":
         rt_file=rt_dir+"/IR_108_BT_"+tnow[:8]+"_"+tnow[-4:]+".nc"
@@ -425,7 +425,7 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         inds, weights, new_shape=uinterp.interpolation_weights(lons_mid[np.isfinite(lons_mid)], lats_mid[np.isfinite(lats_mid)],blobs_lons, blobs_lats, irregular_1d=True)
         np.savez('/home/stewells/AfricaNowcasting/rt_code/weights_data_ex.npz',inds_ex=inds,weights=weights,new_shape=np.array(new_shape))
 
-    print(os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_2_data_ex_a.npz'))
+   # print(os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_2_data_ex_a.npz'))
 # return journey...
     if os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_2_data_ex_a.npz'):
         #print(
@@ -648,11 +648,15 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 
             if os.path.exists(scratchfile):      
                 #print("FOUND")         
-                core_ds=xr.open_dataset(scratchfile)   
-                past_cores.append(core_ds["cores"].data)
+                try:
+                    core_ds=xr.open_dataset(scratchfile)   
+                    past_cores.append(core_ds["cores"].data)
                 #print(np.nanmax(core_ds["cores"].data))
-                past_times.append(core_ds.attrs["time"])
-                core_ds.close()
+                    past_times.append(core_ds.attrs["time"])
+                    core_ds.close()
+                except:
+                    past_cores.append(np.zeros(np.shape(lats_mid))*np.nan)
+                    past_times.append(np.nan)
             else:  
                 past_cores.append(np.zeros(np.shape(lats_mid))*np.nan)
                 past_times.append(np.nan)   
@@ -682,8 +686,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         #rasPath_3857 = geotiff_outpath+"/PastCores_"+tnow+"_3857.tif"
         rasPath = get_portal_outpath('PastCores',tnow)+"/PastCores_"+tnow+".tif"
         rasPath_3857 = get_portal_outpath('PastCores',tnow)+"/PastCores_"+tnow+"_3857.tif"
-        print("PASTCORES")
-        print(rasPath_3857)
+        #print("PASTCORES")
+        #print(rasPath_3857)
         make_geoTiff([allPastCores],rasPath,reprojFile=rasPath_3857,extended=True,v_maj=version_maj['full'],v_min=version_min['full'],v_submin=version_submin['full'],trim=True)    
         os.system('rm '+rasPath)   
 
@@ -845,10 +849,14 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
             scratchfile=scratchdir+"/Convective_struct_extended_"+str(core_time).replace("-"," ").replace(":","").replace(" ","")[:-2]+"_000.nc"
             #print(scratchfile)
             if os.path.exists(scratchfile):
-                core_ds=xr.open_dataset(scratchfile)   
-                past_cores.append(core_ds["cores"].data)
-                past_times.append(core_ds.attrs["time"])
-                core_ds.close()
+                try:
+                    core_ds=xr.open_dataset(scratchfile)   
+                    past_cores.append(core_ds["cores"].data)
+                    past_times.append(core_ds.attrs["time"])
+                    core_ds.close()
+                except:
+                    past_cores.append(np.zeros(np.shape(lats_mid))*np.nan)
+                    past_times.append(np.nan)   
             else:
                 past_cores.append(np.zeros(np.shape(lats_mid))*np.nan)
                 past_times.append(np.nan)   
@@ -1083,7 +1091,7 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
                     dat_rect_max_m1, missing_database_vec_t_m1,poly_val_freq_m1=rect_rt_loop(dat_rect_m1,use_rect,datadir[domain][0],i_search,load_time,filters_real_time[domain],missing_database_vec_t_m1,nadd,lats_mid_sub[domain],do_risk_subdomain[domain])
                     dat_rect_max_m2, missing_database_vec_t_m2,poly_val_freq_m2=rect_rt_loop(dat_rect_m2,use_rect,datadir[domain][1],i_search,load_time,filters_real_time[domain],missing_database_vec_t_m2,nadd,lats_mid_sub[domain],do_risk_subdomain[domain])
                     dat_rect_max_m3, missing_database_vec_t_m3,poly_val_freq_m3=rect_rt_loop(dat_rect_m3,use_rect,datadir[domain][2],i_search,load_time,filters_real_time[domain],missing_database_vec_t_m3,nadd,lats_mid_sub[domain],do_risk_subdomain[domain])
-                    print(domain)
+                    #print(domain)
                     #plt.imshow(dat_rect_max_m1)
                     #plt.show()
                     #plt.imshow(dat_rect_max_m2)
@@ -1688,7 +1696,7 @@ def process_grid_info(nx,ny,nx_dakarstrip,ny_dakarstrip,blob_dx,plot_area,nflics
 #		data=np.zeros([ny,nx])*np.nan
 #	return(data)
 def load_data(date,nx_ny,domain): 
-    print(domain)  
+   # print(domain)  
     if domain=='ssa':
         print("sub-saharan africa")
         nx=2268
@@ -3006,11 +3014,11 @@ def get_dummy_ssa_latlon():
     ny=2080
             #print([nx,ny])
     filename='/mnt/prj/nflics/SSA_data/grads/lat_lon_2268_2080.gra'
-    print(filename)	
+    #(filename)	
     if(os.path.isfile(filename)):
         gen_ints = array.array("f")
         gen_ints.fromfile(open(filename, 'rb'), os.path.getsize(filename) // gen_ints.itemsize)
-        print(np.array(gen_ints).shape)
+        #print(np.array(gen_ints).shape)
         data_strip=np.array(gen_ints).reshape(2,ny,nx)#-173  #data is rows, columns
     else:
         data_strip=np.zeros([2,ny,nx])*np.nan

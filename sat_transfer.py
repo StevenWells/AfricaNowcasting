@@ -119,8 +119,8 @@ def get_data(mirror_path,shadow_run,db_version):
                 recent_thresh = datetime.datetime.now() - datetime.timedelta(seconds=180)
                 if file_stamp2 > recent_thresh:
                     new_files = [current_files[-1]]
-                    print("Corrected current _files")
-                    print(new_files)
+                   # print("Corrected current _files")
+                   # print(new_files)
         else:
             print("this is a shadow run")
             new_files_temp = list(sorted(set(current_files).difference(last_set_files)))
@@ -197,7 +197,7 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline):
     feed = 'eumdat'
     ukceh_mirror=False
     make_gif=False
-    overwrite = False
+    overwrite = True
     ######### shadow run options #######################
     #run shadow run can be set to run 15-minutes behind the main run for contingency against machine problems
 	
@@ -270,7 +270,22 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline):
         plotdir=os.path.join(plotbase,use_year,use_month,use_day,use_time)
         if not os.path.exists(plotdir):
             os.makedirs(plotdir)
-            os.system('chmod g+rwx '+plotdir)
+            try:
+                os.system('chmod g+rwx '+plotdir)
+            except:
+                pass
+            try:
+                os.system('chmod g+rwx '+os.path.join(plotbase,use_year,use_month,use_day))
+            except:
+                pass
+            try:
+                os.system('chmod g+rwx '+os.path.join(plotbase,use_year,use_month))
+            except:
+                pass
+            try:
+                os.system('chmod g+rwx '+os.path.join(plotbase,use_year))
+            except:
+                pass                                              
         else:
             pass
         scratchdir=os.path.join(scratchbase,use_year,use_month,use_day,use_time)
@@ -353,7 +368,7 @@ if runtype=='realtime':
     new_files = []
     try:
         new_files=get_data(mirror_path,shadow_run,db_version)
-        print(new_files)
+        #print(new_files)
         signal.alarm(0)
     except Exception as e:
         print(e)
@@ -380,7 +395,7 @@ else:
     #new_files = glob.glob(mirror_path+"/202208141200.gra")
     new_files = sorted(new_files)
 
-print(new_files)
+#print(new_files)
 
 for new_file in new_files:
     if runtype=='realtime':
@@ -392,7 +407,7 @@ for new_file in new_files:
         #    signal.alarm(0)
     else:
         #try:
-        print(new_file)
+        #print(new_file)
         main_code_loop(new_file,mirror_path,shadow_run,db_version,run_offline)
         #except Exception as e:
         #    print(e)
