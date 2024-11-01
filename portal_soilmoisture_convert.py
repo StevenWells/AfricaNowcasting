@@ -56,14 +56,15 @@ else:
 domainPars = {'WA':{'nx_raw':274,'ny_raw':162,'deltax':0.25,'xll':-18.125,'yll':-15.125},
              'SSA':{'nx_raw':293,'ny_raw':242,'deltax':0.25,'xll':-18.125,'yll':-35.125}}
 
-
-
+# backup output folder if satdev is down
+toSdir = False
 
 # SANS transfer folder
 
 #outPath = '/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data/'
 outPath = '/mnt/HYDROLOGY_stewells/geotiff/lawis_soil_moisture_anomaly/'
 #outPath = '/home/stewells/AfricaNowcasting/satTest/geotiff/lawis_soil_moisture_anomaly/'
+outPathBackup ='/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data/'
 
 # projections
 origEPSG='4326'
@@ -97,7 +98,11 @@ for root in all_files:
     deltax=domainPars[domain]['deltax']
     xll = domainPars[domain]['xll']
     yll=domainPars[domain]['yll']
-    outdir = os.path.join(outPath,dateStr)
+
+    if toSdir:
+        outdir= outPathBackup
+    else:
+        outdir = os.path.join(outPath,dateStr)
     rasFile = filename.split('.')[0]+'.tif'
     reprojFile = filename.split('.')[0]+'_'+str(newEPSG)+'.tif'
     print(outdir)

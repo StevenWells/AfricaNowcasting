@@ -54,10 +54,13 @@ else:
 
 if runtype=='realtime':
    # mirror_path = '/scratch/NFLICS/sftp_extract/current'   # path to NCAS mirror 
-    mirror_path = '/mnt/scratch/cmt'
+    #mirror_path = '/mnt/scratch/cmt'
+    mirror_path = '/mnt/scratch/stewells/MSG_NRT/cut/'
+    backup_mirror = '/mnt/scratch/cmt'
     #mirror_path = '/users/hymod/stewells/NFLICS/SSA/sample_live/'
 else:
     mirror_path = '/mnt/scratch/cmt'
+    backup_mirror = '/mnt/scratch/stewells/MSG_NRT/cut/'
     #mirror_path = '/scratch/NFLICS/sftp_extract/current'
       #mirror_path = '/prj/nflics/real_time_data/2024/01/08/' # path to where historical NCAS raw data to process is held
 
@@ -89,7 +92,7 @@ db_version = sys.argv[2] if len(sys.argv)>2 else 3  # latest
 ##################################################
 # list the files currently in the mirror
 
-def get_data(mirror_path,shadow_run,db_version):
+def get_data(mirror_path,shadow_run,db_version,backup_mirror):
     ##################################################
     #Set up paths 
     ##################################################
@@ -135,8 +138,6 @@ def get_data(mirror_path,shadow_run,db_version):
         new_files = []
         cronFreq=20
         total_files=glob.glob(os.path.join(mirror_path,'IR_108_BT_*nc'))
-        
-
         for f in total_files:
             modTimesinceEpoc = os.path.getmtime(f)
             modificationTime = datetime.datetime.fromtimestamp(time.mktime(time.localtime(modTimesinceEpoc)))
@@ -144,7 +145,16 @@ def get_data(mirror_path,shadow_run,db_version):
 #               only include if not already processed
 
                 new_files.append(f)
-
+        # if new files still empty, check backup
+        if len(new_files)==0:
+            print("Nothing in "+mirror_path+'. Checking backup '+backup_mirror)
+            total_files=glob.glob(os.path.join(backup_mirror,'IR_108_BT_*nc'))
+            for f in total_files:
+                modTimesinceEpoc = os.path.getmtime(f)
+                modificationTime = datetime.datetime.fromtimestamp(time.mktime(time.localtime(modTimesinceEpoc)))
+                if modificationTime > datetime.datetime.today()-datetime.timedelta(minutes=cronFreq):
+#               only include if not already processed
+                    new_files.append(f)
 
     else:
         new_files = list(sorted(last_set_files))
@@ -159,10 +169,12 @@ def get_data(mirror_path,shadow_run,db_version):
 #Loop over new files and create NFLICS nowcasts
 ###############################################
 
-def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline):
+def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup_mirror,overwrite=False):
     import os,glob,shutil,sys
     import netCDF4 as nc
     print("into the main code loop")
+# check is the data from mirror or backup
+
     #########UKCEH file path options#############
     #datadir="/prj/nflics/historical_database/msg9_cell_shape_wave_rect_20040601to20190930_realtime/msg9_cell_shape_wave_rect_" #historical database
     #datadir="/prj/nflics/historical_database/date_split_WA_v2/msg9_cell_shape_wave_rect_20040601to20190930_WA_v2/msg9_cell_shape_wave_rect_"
@@ -197,7 +209,7 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline):
     feed = 'eumdat'
     ukceh_mirror=False
     make_gif=False
-    overwrite = True
+    #overwrite = False
     ######### shadow run options #######################
     #run shadow run can be set to run 15-minutes behind the main run for contingency against machine problems
 	
@@ -214,7 +226,12 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline):
     try:
         test = use_file
         #test=nc.Dataset(use_file) 
+        sourcePath = use_file
+
         use_file=use_file.split("/")[-1] #remove directory (want file name only)
+
+
+
         print("processing file:", use_file)
         if feed=='historical':
             use_year=use_file[:4]
@@ -241,24 +258,25 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline):
         sfile =use_file[:-3]+'_eumdat.nc' if  feed=='eumdat' else use_file
         #print(sfile)
 # if file already in saved folder assume processed and exit function for this file
-        
- 
+   
         if not os.path.exists(os.path.join(savedir,sfile)):
-            shutil.copy2(os.path.join(mirror_path,use_file),os.path.join(savedir,sfile))
+            shutil.copy2(sourcePath,os.path.join(savedir,sfile))
         else:
             if overwrite:
                 print("Overwriting previously processed file")
             else:
                 print("Already processed")
                 return
-
+        
         vis_file = 'VIS_006_rad_'+use_year+use_month+use_day+'_'+use_time+'.nc'
         sfile = vis_file[:-3]+'_eumdat.nc' if  feed=='eumdat' else vis_file
         #print(vis_file)
-        if os.path.exists(os.path.join(mirror_path,vis_file)):# visible channel exists, so copy it too
+        if os.path.exists(os.path.join(os.path.dirname(sourcePath),vis_file)):# visible channel exists, so copy it too
             if not os.path.exists(os.path.join(savedir,sfile)):
-                shutil.copy2(os.path.join(mirror_path,vis_file),os.path.join(savedir,sfile))            
-
+                shutil.copy2(os.path.join(os.path.dirname(sourcePath),vis_file),os.path.join(savedir,sfile))            
+        #elif os.path.exists(os.path.join(backup_mirror,vis_file)):# visible channel exists, so copy it too
+        #    if not os.path.exists(os.path.join(savedir,sfile)):
+        #        shutil.copy2(os.path.join(mirror_path,vis_file),os.path.join(savedir,sfile))    
         
 
 
@@ -298,8 +316,9 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline):
         #3. calculate nowcasts
 		
 		
-		
-        fns.process_realtime_v3(tnow,datadir,mirror_path,plotdir,scratchbase,lst_path,nflics_base,rt_code_input,feed,db_version)
+        fns.process_realtime_v3(tnow,datadir,os.path.dirname(sourcePath),plotdir,scratchbase,lst_path,nflics_base,rt_code_input,feed,db_version)
+        
+        #fns.process_realtime_v3(tnow,datadir,mirror_path,plotdir,scratchbase,lst_path,nflics_base,rt_code_input,feed,db_version)
             
         if ukceh_mirror==True:
             remotedir=os.path.join(remote_path,"nflics_nowcasts",use_year,use_month,use_day,use_time)
@@ -367,7 +386,7 @@ timeStampStart= time.time()
 if runtype=='realtime':
     new_files = []
     try:
-        new_files=get_data(mirror_path,shadow_run,db_version)
+        new_files=get_data(mirror_path,shadow_run,db_version,backup_mirror)
         #print(new_files)
         signal.alarm(0)
     except Exception as e:
@@ -378,28 +397,30 @@ if runtype=='realtime':
 else:
     #ts = ['01','06','07','08','09','10','11']
     #ts = [str(x).zfill(2) for x in range(2,7)]
-    ts = ['21']
+    ts = ['07']
     #ts = ['29']
-    #hrs = [str(x).zfill(2) for x in range(12)]
-    hrs = ['14']
-    mins = ['30']
+    hrs = [str(x).zfill(2) for x in range(14)]
+    #hrs = ['14']
     #mins = ['00']
+    mins = ['00','15','30','45']
     new_files  = []
     for t in ts:
         for h in hrs:
             for m in mins:
                 #new_files = new_files+[mirror_path+"/202207"+t+h+m+'.gra']
-            	new_files=new_files+[mirror_path+"/IR_108_BT_202403"+t+"_"+h+m+'.nc']
-    
-    new_files= glob.glob("/scratch/cmt/IR_108_BT_20240509_0945.nc")
+            	new_files=new_files+[mirror_path+"/IR_108_BT_202410"+t+"_"+h+m+'.nc']
+    print(new_files)
+    new_files  = [x for x in new_files if os.path.exists(x)]
+    #new_files= glob.glob("/mnt/scratch/cmt/IR_108_BT_20240927_0015.nc")
     #new_files = glob.glob(mirror_path+"/202208141200.gra")
     new_files = sorted(new_files)
-
+    print(new_files)
 #print(new_files)
 
 for new_file in new_files:
     if runtype=='realtime':
-        main_code_loop(new_file,mirror_path,shadow_run,db_version,run_offline)
+
+        main_code_loop(new_file,mirror_path,shadow_run,db_version,run_offline,backup_mirror)
         a2=signal.alarm(a2)
         #except Exception as e:
         #    print(e)
@@ -408,7 +429,7 @@ for new_file in new_files:
     else:
         #try:
         #print(new_file)
-        main_code_loop(new_file,mirror_path,shadow_run,db_version,run_offline)
+        main_code_loop(new_file,mirror_path,shadow_run,db_version,run_offline,backup_mirror,overwrite=True)
         #except Exception as e:
         #    print(e)
         #    print("Error in processing of "+new_file)

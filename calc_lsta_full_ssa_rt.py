@@ -243,7 +243,8 @@ def subset_var(var, lon, lat, bbox):
 
 
 # CODE STARTS HERE
-rt_feedRoot = '/mnt/scratch/semval1/SEVIRI_LST/data/'
+rt_feedRoot = '/mnt/scratch/stewells/SEVIRI_LST/data/'
+#rt_feedRoot = '/mnt/scratch/semval1/SEVIRI_LST/data/'
 tmpRoot = '/mnt/scratch/stewells/SEVIRI_LST/data/tmp/'
 # get todays date
 dnow= datetime.now()
@@ -254,7 +255,7 @@ liveFiles  = glob.glob(rtDir+'/HDF5_LSASAF_MSG_LST*_'+dnow.strftime('%Y%m%d')+'*
 newFnames = sorted(list(set([x.split('/')[-1] for x in liveFiles]).difference([x.split('/')[-1] for x in currentFiles])))
 newFiles = [os.path.join(rtDir,x) for x in newFnames]
 
-
+print(newFiles)
 
 ### Read latitude longitude file 
 lon_m, fid = read_var(file_lon, "LON")
@@ -317,7 +318,8 @@ for file in newFiles:
  
 
 
-        datadir= '/mnt/scratch/semval1/SEVIRI_LST/data/'+strings
+        #datadir= '/mnt/scratch/semval1/SEVIRI_LST/data/'+strings
+        datadir= '/mnt/scratch/stewells/SEVIRI_LST/data/'+strings
         tmpdir =  '/mnt/scratch/stewells/SEVIRI_LST/data/tmp/'+strings
         archivedir = '/mnt/prj/swift/SEVIRI_LST/lsta_ssa/nrt/'+strings
 
@@ -492,20 +494,25 @@ if updatedMean: # some new files were processed so recalculate the daily mean
             fin = dataanom+"/LSASAF_lst_anom_wrt_histclim_withmask_"+now+".nc"
             #print(fin)
             if os.path.exists(fin):
-              print(fin)
-              fid = Dataset(fin, "r")
-              var_a = fid.variables['lsta'][:,:]
+                print(fin)
+                try:
+                    fid = Dataset(fin, "r")
+                    var_a = fid.variables['lsta'][:,:]
 			  
-              hour=(idate)/4.
-              lhour=lons/360.*24.+hour
-              lsum = np.where((lhour>=7) & (lhour<=17) & (var_a < 1.0*10**30),lsum+var_a,lsum)
-              nsum = np.where((lhour>=7) & (lhour<=17) & (var_a < 1.0*10**30),nsum+1,nsum)
+                    hour=(idate)/4.
+                    lhour=lons/360.*24.+hour
+                    lsum = np.where((lhour>=7) & (lhour<=17) & (var_a < 1.0*10**30),lsum+var_a,lsum)
+                    nsum = np.where((lhour>=7) & (lhour<=17) & (var_a < 1.0*10**30),nsum+1,nsum)
+            
               #lsum[lhour>=7 and lhour<=17 and var_a< 10^30]+=lsta
-    
+                except:
+                    print("Failed to open file "+fin)
+                    continue
  
 			  #allfiles[tnow]=var_a
             else:
-              continue  
+                print("No such file "+fin)
+                continue  
     # allfiles is a dictionary of the files linked to UTC time they apply to
 
     # loop over times in the day (would normally be the same as above but testing here for 1200

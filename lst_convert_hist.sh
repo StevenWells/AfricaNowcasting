@@ -16,12 +16,12 @@ large_value=9.00000e+10
 # argument to script = full path to NETCDF file
 
 # get list of files edited 
-FILES=$(find  /mnt/prj/swift/SEVIRI_LST/lsta_ssa/nrt/  -type f -mmin -15)
+FILES=$(find  /mnt/prj/swift/SEVIRI_LST/lsta_ssa/nrt/202407/LSASAF*20240716*)
 
 
 for FFILE in $FILES
 do
-echo $FFILE
+
 fullfile="$FFILE"
 
 filename=$(basename -- "$fullfile")
@@ -32,20 +32,17 @@ filename="${filename%.*}"
 #LSASAF_lst_anom_Daymean_withmask_withHistClim_20220326.nc
 curr_date=${filename: -13}
 curr_day=${curr_date:: 8}
-#root="/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data/"
-
+#root="/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data/"
+#root="/home/stewells/AfricaNowcasting/satTest/geotiff/lawis_lsta/"
 root="/mnt/HYDROLOGY_stewells/geotiff/lawis_lsta/"
 wdir="/home/stewells/AfricaNowcasting/tmp/"
 
 mkdir -p $root$curr_day
 
 
+
 newfile=$root$curr_day'/LSASAF_lst_anom_Daymean_withmask_withHistClim_'$curr_date'_mask.tif'
-#newfile=$root'/LSASAF_lst_anom_Daymean_withmask_withHistClim_'$curr_date'_mask.tif'
-
-
 newfile_pre=$wdir'tmp_LSASAF_'$curr_date'.tif'
-newfile_ready=$wdir'tmp_LSASAF_'$curr_date'_ready.tif'
 tmptif=$wdir'tmpfile_lst.tif'
 tmpvrt=$wdir'tmpfile2_lst.vrt'
 
@@ -92,12 +89,9 @@ gdal_rasterize -i -burn -998  ../ancils/shapefiles/ssa_landboundary_3857.shp $ne
 # get rid of any erroneous leftover nans
 gdal_calc.py -A $newfile_pre --calc="(A<$large_value)*A + (A>$large_value)*-999" --outfile $newfile_pre --NoDataValue=-999
 
-gdal_translate  -co compress=LZW $newfile_pre $newfile_ready
-ls $wdir
-cp -f $newfile_ready $newfile
+gdal_translate  -co compress=LZW $newfile_pre $newfile
 
- rm -f $newfile_ready
- rm -f $newfile_pre
+# rm tmp*tif
 # rm tmp*.vrt
 done
 

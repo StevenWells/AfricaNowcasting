@@ -1,0 +1,31 @@
+#!/bin/sh
+
+YEAR=`date -u +"%Y"`
+MONTH=`date -u +"%m"`
+DAY=`date -u +"%d"`
+
+#MONTH=06
+#DAY=29
+
+USER=cmt
+#
+# note METOP-A (h101) stopped in late 2021
+# 20/6/22 added -u to date to avoid missing final evening overpasses during
+# British Summer Time
+#
+
+mkdir -p "/mnt/scratch/$USER/h16/$YEAR/$MONTH/$DAY/"
+
+mkdir -p "/mnt/scratch/$USER/h104/$YEAR/$MONTH/$DAY/"
+
+# whats this for?
+## mkdir -p "/mnt/prj/swift/ASCAT_cmt/NRT/$YEAR/$MONTH/$DAY/"
+
+wget -nc "ftp://ftphsaf.meteoam.it:/h16/h16_cur_mon_data/*$YEAR$MONTH$DAY*" -P "/mnt/scratch/$USER/h16/$YEAR/$MONTH/$DAY/"
+
+#wget -nc "ftp://ftphsaf.meteoam.it:/h101/h101_cur_mon_data/*$YEAR$MONTH$DAY*" -P "/scratch/cmt/h101/$YEAR/$MONTH/$DAY/"
+
+wget -nc "ftp://ftphsaf.meteoam.it:/h104/h104_cur_mon_data/*$YEAR$MONTH$DAY*" -P "/mnt/scratch/$USER/h104/$YEAR/$MONTH/$DAY/"
+
+
+

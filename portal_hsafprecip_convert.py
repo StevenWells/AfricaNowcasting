@@ -25,6 +25,8 @@ reprocess_data=False
 # make point value file
 do_point_vals = False
 
+# use backup output dir
+toSdir = False
 
 # Path to raw archive (data pulled down from HSAF - probably will be simplified as will delete these on the fly
 rawArchive = '/mnt/prj/nflics/NRT_HSAF/precip_h60/full_msg/'
@@ -165,8 +167,11 @@ def update_accumulations(hsafNow,tnow,plotdir,tmpdir,inds_ex, weights_ex, new_sh
             accArr_i = accArr_i[(cutout[1]):(cutout[0]+1),(cutout[2]-1):(cutout[3])][:,::-1]
             accArr_i = accArr_i[grid_lims_ex[0]:grid_lims_ex[2],grid_lims_ex[1]:grid_lims_ex[3]]
             accArr_i_const=uinterp.interpolate_data(accArr_i, inds_ex, weights_ex, new_shape_ex)	
+            if toSdir:
+                geotiff_outpath_acc = '/mnt/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data/'
+            else:
             #geotiff_outpath_acc = os.path.join('/home/stewells/AfricaNowcasting/satTest/geotiff/ssa_hsaf_precip_accum',tnowS)
-            geotiff_outpath_acc = os.path.join('/mnt/HYDROLOGY_stewells/geotiff/ssa_hsaf_precip_accum',tnowS[:8])
+                geotiff_outpath_acc = os.path.join('/mnt/HYDROLOGY_stewells/geotiff/ssa_hsaf_precip_accum',tnowS[:8])
             if not os.path.exists(geotiff_outpath_acc):
                 os.makedirs(geotiff_outpath_acc)
             rasPath = os.path.join(tmpdir,"HSAF_precip_acc"+str(acchr)+"h_"+tnowS+"_SSA.tif")
@@ -331,8 +336,11 @@ for rfile in rfiles:
                 tnow_day = '_'.join(rfile.split('/')[-1].split('_')[1:3])
                 tnow = datetime.datetime.strptime(tnow_day,"%Y%m%d_%H%M")
                 tnowStr = tnow.strftime("%Y%m%d")
+                if toSdir:
+                    geotiff_outpath = '/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data/'
+                else:
                 #geotiff_outpath = os.path.join('/home/stewells/AfricaNowcasting/satTest/geotiff/ssa_hsaf_precip',tnowStr)
-                geotiff_outpath = os.path.join('/mnt/HYDROLOGY_stewells/geotiff/ssa_hsaf_precip',tnowStr)
+                    geotiff_outpath = os.path.join('/mnt/HYDROLOGY_stewells/geotiff/ssa_hsaf_precip',tnowStr)
                 #geotiff_outpath = os.path.join('/mnt/HYDROLOGY_stewells/geotiff/ssa_hsaf_precip',tnowStr)
                 print("Processing HSAF data for "+datetime.datetime.strftime(tnow,"%Y-%m-%d %H:%M")) 
                 use_times=[tnow]

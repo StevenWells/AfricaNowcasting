@@ -15,11 +15,12 @@ delta_x = 0.02701729106
 dataDir='/mnt/prj/swift/rain_over_africa'
 tmpDir='/home/stewells/AfricaNowcasting/tmp/'
 geotiffDir = '/mnt/HYDROLOGY_stewells/geotiff/ssa_africarain_precip_accum/'
+backupDir = '/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data'
 #geotiffDir = '/home/stewells/AfricaNowcasting/satTest/'
 testDate = '202406201300'
 accPeriods = [1,3,6,24,48,72]
 
-
+toSdir = False
 
 
 def make_geoTiff(data,rasFile,doReproj = True,origEPSG='4326',newEPSG='3857',reprojFile='test.tif',trim=False):
@@ -88,12 +89,14 @@ def getAccs(tnow,accPeriods,dataDir,tmpDir,geotiffDir):
             iacc = iacc/2.0
         if ix in [x*4-1 for x in accPeriods]: # list of indices corresponding to accumulation periods
             acchr = int((ix+1)/4)
-            print(acchr+'hr')
+            print(str(acchr)+'hr')
             accArr_i = np.array(np.round(0.25*np.add(accArray,iacc/2.0),2))
             accArr_i[accArr_i < 1] = 0.0
             rasPath = os.path.join(tmpDir,"HSAF_precip_acc"+str(acchr)+"h_"+tnowStr+"_SSA.tif")
-
-            rasPath_3857 = os.path.join(geotiffDir,tnow.strftime('%Y%m%d'),"rainoverAfrica_SSA_"+tnowStr+"_acc"+str(acchr)+"h_3857.tif")
+            if toSdir:
+                rasPath_3857 = os.path.join(backupDir,"rainoverAfrica_SSA_"+tnowStr+"_acc"+str(acchr)+"h_3857.tif")
+            else:
+                rasPath_3857 = os.path.join(geotiffDir,tnow.strftime('%Y%m%d'),"rainoverAfrica_SSA_"+tnowStr+"_acc"+str(acchr)+"h_3857.tif")
 
             make_geoTiff([accArr_i],rasPath,reprojFile=rasPath_3857,trim=True)
             os.system('rm '+rasPath)

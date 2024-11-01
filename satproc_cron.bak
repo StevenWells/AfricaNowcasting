@@ -2,18 +2,29 @@
 # Africa Nowcasting scheduled tasks
 # ---------------------------------------------------------------------
 MAILTO="stewells@ceh.ac.uk"
-#
+### Download MSG data
+### * * * * * /usr/bin/flock -n /home/stewells/AfricaNowcasting/tmp/satdwnld.lockfile /home/stewells/AfricaNowcasting/rt_code/msg_download.sh >>/home/stewells/AfricaNowcasting/logs/msg_dwnld.log 2>&1
 ### NFLICS Cores and nowcasts
- * * * * /usr/bin/flock -n /home/stewells/AfricaNowcasting/tmp/satproc.lockfile /home/stewells/AfricaNowcasting/rt_code/run_satproc.sh >>/home/stewells/AfricaNowcasting/logs/run_satproc.log 2>&1
+### * * * * * /usr/bin/flock -n /home/stewells/AfricaNowcasting/tmp/satproc.lockfile /home/stewells/AfricaNowcasting/rt_code/run_satproc.sh >>/home/stewells/AfricaNowcasting/logs/run_satproc.log 2>&1
 ### COnvert LMF to Geotiff
-*/2 * * * * /usr/bin/flock -n /home/stewells/AfricaNowcasting/tmp/lmfproc.lockfile /home/stewells/AfricaNowcasting/rt_code/lmf_convert.sh >>/home/stewells/AfricaNowcasting/logs/lmf_convert.log 2>&1
+### */2 * * * * /usr/bin/flock -n /home/stewells/AfricaNowcasting/tmp/lmfproc.lockfile /home/stewells/AfricaNowcasting/rt_code/lmf_convert.sh >>/home/stewells/AfricaNowcasting/logs/lmf_convert.log 2>&1
 ### Convert LSTA daily mean to Geotiff
-*/2 * * * * /usr/bin/flock -n /home/stewells/AfricaNowcasting/tmp/lstproc.lockfile /home/stewells/AfricaNowcasting/rt_code/lst_convert.sh >>/home/stewells/AfricaNowcasting/logs/lst_convert.log 2>&1
+### */5 * * * * /usr/bin/flock -n /home/stewells/AfricaNowcasting/tmp/lstproc.lockfile /home/stewells/AfricaNowcasting/rt_code/lst_convert.sh >>/home/stewells/AfricaNowcasting/logs/lst_convert.log 2>&1
 ### Convert Soil Mositure Anomaly to GeoTiff
-*/2 * * * * /usr/bin/flock -n /home/stewells/AfricaNowcasting/tmp/smaproc.lockfile /home/stewells/AfricaNowcasting/rt_code/run_sm_convert.sh >>/home/stewells/AfricaNowcasting/logs/sma_convert.log 2>&1
-# Convert HSAF precipitation to Geotiff (rate and accumulations)
-*/2 * * * * /usr/bin/flock -n /home/stewells/AfricaNowcasting/tmp/hsafproc.lockfile /home/stewells/AfricaNowcasting/rt_code/run_hsaf_precip_convert.sh >>/home/stewells/AfricaNowcasting/logs/hsaf_convert.log 2>&1
-# Convert Rain Over Africa rainfall to Geotiff (accumualtions only)
-*/2 * * * * /usr/bin/flock -n /home/stewells/AfricaNowcasting/tmp/roaaccproc.lockfile /home/stewells/AfricaNowcasting/rt_code/run_roa_accums.sh >>/home/stewells/AfricaNowcasting/logs/roaacc_convert.log 2>&1
-# Process raw LSTA data into daily means
-*/5 * * * * /usr/bin/flock -n /home/stewells/AfricaNowcasting/tmp/lstadmeanproc.lockfile /home/stewells/AfricaNowcasting/rt_code/run_lsta_process.sh >>/home/stewells/AfricaNowcasting/logs/lsta_dmean.log 2>&1
+### */2 * * * * /usr/bin/flock -n /home/stewells/AfricaNowcasting/tmp/smaproc.lockfile /home/stewells/AfricaNowcasting/rt_code/run_sm_convert.sh >>/home/stewells/AfricaNowcasting/logs/sma_convert.log 2>&1
+### Convert HSAF precipitation to Geotiff (rate and accumulations)
+### */2 * * * * /usr/bin/flock -n /home/stewells/AfricaNowcasting/tmp/hsafproc.lockfile /home/stewells/AfricaNowcasting/rt_code/run_hsaf_precip_convert.sh >>/home/stewells/AfricaNowcasting/logs/hsaf_convert.log 2>&1
+###  Convert Rain Over Africa rainfall to Geotiff (accumualtions only)
+###*/2 * * * * /usr/bin/flock -n /home/stewells/AfricaNowcasting/tmp/roaaccproc.lockfile /home/stewells/AfricaNowcasting/rt_code/run_roa_accums.sh >>/home/stewells/AfricaNowcasting/logs/roaacc_convert.log 2>&1
+### Process raw LSTA data into daily means
+###*/5 * * * * /usr/bin/flock -n /home/stewells/AfricaNowcasting/tmp/lstadmeanproc.lockfile /home/stewells/AfricaNowcasting/rt_code/run_lsta_process.sh >>/home/stewells/AfricaNowcasting/logs/lsta_dmean.log 2>&1
+### pushing SM data to CHris' scratch
+### */10 * * * * /usr/bin/flock -n /home/stewells/AfricaNowcasting/tmp/get_sm.lockfile /home/stewells/AfricaNowcasting/fromChris/ascat_code/hsaf_data_copy_satdev >> /home/stewells/AfricaNowcasting/logs/get_sm.log 2>&1
+# Semeena's seviri ftp
+*/15 03-23 * * * /usr/bin/flock -n  /home/stewells/AfricaNowcasting/tmp/seviri_ftp.lockfile /home/stewells/AfricaNowcasting/seviri_lst/seviri_ftp.sh   >>  /home/stewells/AfricaNowcasting/logs/seviriftp.log 2>&1
+# Semeenas ftp pptn data from jsimpson (NASA) Every hour at 14th minute for 0000hr data
+02 * * * * /usr/bin/flock -n  /home/stewells/AfricaNowcasting/tmp/nasa_ftp_0000.lockfile /home/stewells/AfricaNowcasting/seviri_lst/ftpsimpson_and_converttif2NC_0000hr_curl.sh >>  /home/stewells/AfricaNowcasting/logs/ftpsimson_0000.log 2>&1
+# Semeenas ftp pptn data from jsimpson (NASA) Every hour at 32th minute for 0030hr data
+32 * * * * /usr/bin/flock -n  /home/stewells/AfricaNowcasting/tmp/nasa_ftp_0030.lockfile /home/stewells/AfricaNowcasting/seviri_lst/ftpsimpson_and_converttif2NC_0030hr_curl.sh >>  /home/stewells/AfricaNowcasting/logs/ftpsimson_0030.log 2>&1
+# FHIM India update forecast list
+*/20 * * * * /usr/bin/flock -n /home/stewells/FHIM_India/tmp/update_fhimlist.lockfile /usr/bin/python /home/stewells/FHIM_India/data_transfer/update_datelist.py >> /home/stewells/FHIM_India/logs/update_datelist.log 2>&1

@@ -3098,8 +3098,8 @@ def get_portal_outpath(datatype,tnow,viaS = False):
 			   'ConStruct':os.path.join(outRoot,'geotiff','lawis_construct',tstring),
 			   'PastCores':os.path.join(outRoot,'geotiff','lawis_past_cores',tstring),
 			   'Vis':os.path.join(outRoot,'geotiff','lawis_visible_channel',tstring),
-			   'Nowcast_ts':os.path.join(outRoot,'lawis_west_africa','nflics_nowcast',tstring),
-			   'Risk':os.path.join(outRoot,'lawis_west_africa','nflics_nowcast',tstring)}
+			   'Nowcast_ts':os.path.join(outRoot,'lawis-west-africa','nflics_nowcast',tstring),
+			   'Risk':os.path.join(outRoot,'lawis-west-africa','nflics_nowcast',tstring)}
 	
     if not os.path.exists(outDirs[datatype]):
         os.makedirs(outDirs[datatype])

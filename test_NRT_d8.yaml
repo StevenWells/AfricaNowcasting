@@ -1,0 +1,8 @@
+product: HRSEVIRI
+name: HRSEVIRI channels 1 and 9 over sub-Saharan window in netcdf format - ROI here is almost same as from original SSA_chain.yaml - using -37.34 rather than -37.35. test_NRT_d7a.yaml stopped producing the right sized file when the eumdac software version was updated (27/5/24)
+filter: 
+  bands: 
+  - channel_1
+  - channel_9
+format: netcdf4
+roi: {NSWE: [24.9,-37.34,-23,61.9]}
