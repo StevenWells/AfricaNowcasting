@@ -1,0 +1,10 @@
+[Unit]
+Description="Run afnow_nflics.service every minute relative to activation time"
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Unit=afnow_nflics.service
+
+[Install]
+WantedBy=timers.target

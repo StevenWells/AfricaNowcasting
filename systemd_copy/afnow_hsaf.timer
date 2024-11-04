@@ -1,0 +1,10 @@
+[Unit]
+Description="Run afnow_hsaf.service every 2 minutes relative to activation time"
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+Unit=afnow_hsaf.service
+
+[Install]
+WantedBy=timers.target

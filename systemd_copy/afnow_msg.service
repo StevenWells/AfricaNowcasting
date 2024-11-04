@@ -1,0 +1,9 @@
+[Unit]
+Description="Download MSG data from EUMetsat for use in Nowcasting processing"
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/msg_download.sh
+StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_msg.output
+StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_msg.error
+Type=oneshot
+TimeoutStartSec=300

@@ -1,0 +1,8 @@
+[Unit]
+Description="Archive "
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/portal_tidy.sh
+StandardOutput=file:/home/stewells/AfricaNowcasting/logs/portal_tidy.output
+StandardError=file:/home/stewells/AfricaNowcasting/logs/portal_tidy.error
+Type=oneshot

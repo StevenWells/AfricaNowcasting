@@ -1,0 +1,8 @@
+[Unit]
+Description="Process LMF data for Nowcasting portal"
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/lmf_convert.sh
+StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_lmf.output
+StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_lmf.error
+Type=oneshot

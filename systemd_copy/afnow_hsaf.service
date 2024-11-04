@@ -1,0 +1,8 @@
+[Unit]
+Description="Process HSAF rainfall data (rate and accumulation) for Nowcasting portal"
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/run_hsaf_precip_convert.sh
+StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_hsaf.output
+StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_hsaf.error
+Type=oneshot

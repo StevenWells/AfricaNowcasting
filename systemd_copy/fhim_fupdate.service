@@ -1,0 +1,8 @@
+[Unit]
+Description="FHIM-India update forecast file on Lancaster SAN"
+
+[Service]
+ExecStart=/home/stewells/FHIM_India/data_transfer/update_datelist.sh
+StandardOutput=file:/home/stewells/FHIM_India/logs/fhim_fupdate.output
+StandardError=file:/home/stewells/FHIM_India/logs/fhim_fupdate.error
+Type=oneshot

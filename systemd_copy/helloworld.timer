@@ -1,0 +1,10 @@
+[Unit]
+Description="Run hellowworld.service every 10s relative to activation time"
+
+[Timer]
+OnBootSec=10sec
+OnUnitActiveSec=10sec
+Unit=helloworld.service
+
+[Install]
+WantedBy=timers.target

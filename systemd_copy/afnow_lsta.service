@@ -1,0 +1,8 @@
+[Unit]
+Description="Process LSTA data for Nowcasting portal"
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/lst_convert.sh
+StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_lsta.output
+StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_lsta.error
+Type=oneshot

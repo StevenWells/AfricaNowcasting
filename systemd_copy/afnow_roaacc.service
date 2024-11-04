@@ -1,0 +1,8 @@
+[Unit]
+Description="Generate rain over africa accumulation data for Nowcasting portal"
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/run_roa_accums.sh
+StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_roaacc.output
+StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_roaacc.error
+Type=oneshot

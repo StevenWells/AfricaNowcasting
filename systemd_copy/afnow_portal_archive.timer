@@ -1,0 +1,9 @@
+[Unit]
+Description="Run afnow_portal_archive.service every day at 02:00 relative to activation time"
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+Unit=afnow_portal_archive.service
+
+[Install]
+WantedBy=timers.target

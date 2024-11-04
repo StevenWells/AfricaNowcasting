@@ -1,0 +1,10 @@
+[Unit]
+Description="Run afnow_msg.service every 1 minute relative to activation time"
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Unit=afnow_msg.service
+
+[Install]
+WantedBy=timers.target

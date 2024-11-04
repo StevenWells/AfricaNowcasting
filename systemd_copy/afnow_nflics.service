@@ -1,0 +1,8 @@
+[Unit]
+Description="Process MSG cores, visible data and nowcasts for Nowcasting portal"
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/run_satproc.sh
+StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_nflics.output
+StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_nflics.error
+Type=oneshot

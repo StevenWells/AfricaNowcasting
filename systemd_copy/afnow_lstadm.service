@@ -1,0 +1,8 @@
+[Unit]
+Description="Generate LSTA Daily mean files from 15 minute images"
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/run_lsta_process.sh
+StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_lstadm.output
+StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_lstadm.error
+Type=oneshot

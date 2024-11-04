@@ -1,0 +1,8 @@
+[Unit]
+Description="Process soil mositure data for Nowcasting portal"
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/run_sm_convert.sh
+StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_sm.output
+StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_sm.error
+Type=oneshot

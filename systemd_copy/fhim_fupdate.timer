@@ -1,0 +1,10 @@
+[Unit]
+Description="Run fhim_fupdate.service every 20 minutes relative to activation time"
+
+[Timer]
+OnBootSec=20min
+OnUnitActiveSec=20min
+Unit=fhim_fupdate.service
+
+[Install]
+WantedBy=timers.target

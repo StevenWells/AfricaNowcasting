@@ -1,0 +1,8 @@
+[Unit]
+Description="Push soil moisture data to CMT scratch"
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/hsaf_data_copy_satdev
+StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_smpush.output
+StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_smpush.error
+Type=oneshot

@@ -1,0 +1,6 @@
+[Unit]
+Description="Hello world script"
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/dev/systemd/helloworld.sh 
+Type=oneshot

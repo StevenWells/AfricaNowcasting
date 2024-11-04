@@ -1,0 +1,10 @@
+[Unit]
+Description="Run afnow_lstadm.service every 5 minutes relative to activation time"
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+Unit=afnow_lstadm.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,10 @@
+[Unit]
+Description="Run afnow_lightning.service every 2 minutes relative to activation time"
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+Unit=afnow_lightning.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,10 @@
+[Unit]
+Description="Run afnow_smpush.service every 10 minutes relative to activation time"
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=10min
+Unit=afnow_smpush.service
+
+[Install]
+WantedBy=timers.target

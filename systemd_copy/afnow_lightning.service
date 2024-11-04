@@ -1,0 +1,8 @@
+[Unit]
+Description="Process lightning data for Nowcasting portal"
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/run_lightning_alt.sh
+StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_lightning.output
+StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_lightning.error
+Type=oneshot
