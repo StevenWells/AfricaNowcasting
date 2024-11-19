@@ -5,10 +5,12 @@
 # Convert raw .gra lightning grids from Chris Taylor to CSV format listing pixels in 
 # SSA domain where lightning flashes occur
 #
-# Usage:  python portal_lightning_pt_convert.py <mode> <<startdate>> <<enddate>>
+# Usage:  python portal_lightning_pt_convert.py <mode> <<startdate>> <<enddate>> <toPortal>
 #         <mode> = 'realtime' or 'historical'. If missing, defaults to realtime
 #         <<startdate>>, <<enddate>>: if <mode>==historical, then start and end date define the period 
 #         NB. Dates will be rounded to nearest 15 minutes to align with input data
+#         <<toPortal>> = 1 or 0. 1 Will send data to the portal. 0 Will send data to local drive (for test purposes). 
+#         If missing, Defaults to 1 (send to portal). Note to use this, <mode> must also be specified
           
 import os, sys
 import numpy as np
@@ -30,13 +32,12 @@ cronFreq = 15
  #makes lightning csv file of point locations from gridded data
 
 dataDir = '/mnt/scratch/cmt/flash_count_NRT'
-#outDir = '/mnt/HYDROLOGY_stewells/lawis-west-africa/mtg_lightning'
-outDir= '/home/stewells/AfricaNowcasting/dev/lightning/test_out'
-#archiveDir='/mnt/prj/nflics/lightning'
-archiveDir='/home/stewells/AfricaNowcasting/dev/lightning/test_out'
+portalDir = '/mnt/HYDROLOGY_stewells/lawis-west-africa/mtg_lightning'
+testDir = '/home/stewells/AfricaNowcasting/dev/lightning/test_out'
+liveArchiveDir='/mnt/prj/nflics/lightning'
+testArchiveDir='/home/stewells/AfricaNowcasting/dev/lightning/test_out'
 
 mode = 'realtime'
-
 if len(sys.argv)>1: 
     if sys.argv[1] in ['realtime','historical']:
         mode = sys.argv[1]
@@ -44,6 +45,7 @@ if len(sys.argv)>1:
         print("ERROR: Incorrect mode speficied. Must be either \'realtime\' or \'historical\'")
         sys.exit(0) 
 # if historical then load the start and end date
+
 
 def roundDate(dt,nmin=raw_tdelta):
     mins = (dt.minute // nmin)* nmin
@@ -66,6 +68,18 @@ if mode=='historical':
     except:
         print("ERROR: incorrect format for dates. Need to be YYYYMMDDhhmm")
         sys.exit(0)
+    try:
+        sendToPortal = int(sys.argv[4])
+    except:
+        sendToPortal = 1    
+
+    if sendToPortal==1:
+        outDir = portalDir
+        archiveDir=liveArchiveDir
+    else:
+        outDir= testDir
+        archiveDir=testArchiveDir
+
     if endDate < startDate:
         print("End date provided is before the start date!")
         sys.exit(0) 
@@ -103,6 +117,18 @@ elif mode=='realtime':
     # get recent files
     new_files = []
 
+    try:
+        sendToPortal = int(sys.argv[2])
+    except:
+        sendToPortal = 1   
+
+    if sendToPortal==1:
+        outDir = portalDir
+        archiveDir=liveArchiveDir
+    else:
+        outDir= testDir
+        archiveDir=testArchiveDir
+    
     t0 = datetime.datetime.today()
     #total_files=glob.glob(os.path.join(dataDir,str(t0.year),str(t0.month).zfill(2),'*.gra'))
     total_files=glob.glob(os.path.join(dataDir,'*.gra'))
