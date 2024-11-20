@@ -3105,3 +3105,16 @@ def get_portal_outpath(datatype,tnow,viaS = False):
         os.makedirs(outDirs[datatype])
     return outDirs[datatype]
 
+def roundDate(dt,nmin=15):
+    mins = (dt.minute // nmin)* nmin
+    if dt.minute % nmin >= 7.5:
+        mins+=nmin
+    return dt.replace(minute=0,second=0,microsecond=0)+datetime.timedelta(minutes=mins)
+def generate_dates(start,end,interval):
+    dateList = []
+    current = start
+    delta = datetime.timedelta(minutes =interval)
+    while current <= end:
+        dateList.append(current)
+        current+= delta
+    return dateList

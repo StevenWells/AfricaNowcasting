@@ -2,6 +2,23 @@
 
 This Readme describes the scripts available in the repository and their usage. Note that some scripts require additional data/files that are not contained within the repository. The real-time workflows are controlled by systemd timers and services. Details of the workflow configuration are described elsewhere; this is merely a catalogue of the scripts in use as part of the real-time system. 
 
+### Cloud top temperature, Visible radiation, cores and nowcasts
+
+The processing reads in CTT data (either in NetCDF format as delivered by EUMDAT or raw .gra files) and generates corresponding GeoTIFFs for the CTT, convective cores (current and recent) and nowcast probabilities. 
+
+Script: **sat_transfer.py** <br />
+Usage: sat_transfer.py [-h] [--startDate STARTDATE] [--endDate ENDDATE]  <br />
+                       [--toPortal TOPORTAL] [--feed {eumdat,historical}]<br />
+                       [--fStruct {direct,YMD,YM}]<br />
+                       {realtime,historical}<br />
+runmode (required): realtime (pick up any recently avaiable files) or historical (process a range of dates from pre-existing data)<br />
+--startDate YYYYMMDDhhmm: Start date for historical processing (only necessary if running in historical mode )<br />
+--endDate YYYYMMDDhhmm: Start date for historical processing (only necessary if running in historical mode )<br />
+--toPortal TOPORTAL: Boolean (True or False) flag indicating if output is to be sent to the portal or saved locally. The local path is defined within the script. Default is `True`.<br />
+--feed {eumdat,historical}: Source of feed for historical processing. Not required for realtime running. EUMDAT .nc files (eumdat) or raw .gra files (historical). Default is `eumdat`.<br />
+--fStruct {direct,YMD,YM}: Folder structure for historical data. Root directory controlled by variable mirror_path, but data may sit in subfolders. Options are `direct` (data in mirror_path), `YMD` (data in mirror_path/YYYY/MM/DD folder) or `YM` (data in mirror_path/YYYY/MM folder). Not required for realtime running. Default is `direct`.<br />
+
+
 
 ### Lightning flashes
 

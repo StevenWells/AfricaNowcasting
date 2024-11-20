@@ -35,22 +35,79 @@ import netCDF4 as nc
 import process_realtime_fns as fns   #will need to move this code into sftp_extract directory
 import time
 import datetime
-
+import argparse
 ##################################################
 #Set up paths (more below inside the main_code_loop and get_dat functions!)
 ##################################################
 
-
 ##################################################
 #Get datype of run (historical or real-time)
 ##################################################
-runtype = sys.argv[1]
-if runtype.lower() not in ['historical','realtime']:
-    print('Run type incorrectly defined. Must either be \"historical\" or \"realtime\"')
-else:
-    runtype = runtype.lower()
+parser= argparse.ArgumentParser(description="Generate Africa nowcasts from MSG satellite data")
+# required arguments (positional)
+parser.add_argument("runmode", choices=["realtime","historical"], help="Run mode (real time or historical)",default='realtime')
+
+# datetimes for historical
+parser.add_argument("--startDate", type=str, help="Start Date (YYYYMMDDhhmm).")
+parser.add_argument("--endDate", type=str, help="Start Date (YYYYMMDDhhmm).")
+
+# to portal
+parser.add_argument("--toPortal", type=bool, default = True, help="Send data to portal (True) or local (False)")
+
+# feed (eumdat [.nc files], historical [.gra])  
+parser.add_argument("--feed", choices=["eumdat","historical"],default ='eumdat', help="Feed data source: EUMDAT(eumdat) or raw .gra (historical)")
+
+# folder structure of historical data
+# historical folder structure: 
+# 'direct' (in mirror_path directly)
+# 'YMD'    (in mirror_path/YYYY/MM/DD)
+# 'YM'     (in mirror_path/YYYY/MM)
+parser.add_argument("--fStruct", choices=["direct","YMD","YM"],default ='direct', help="Folder structure for historical data: direct, YMD, or YM")
 
 
+args = parser.parse_args()
+if args.runmode =='historical':
+    if not args.startDate:
+        parser.error("Start date (--startDate) not specified for historical processing")
+    if not args.endDate:
+        parser.error("End date (--endDate) not specified for historical processing")
+
+
+# default to sending to the SAN    
+toPortal = 1
+# default image window
+raw_tdelta = 15  # minutes of raw data interval
+
+# set the variables
+fStruct = args.fStruct
+runtype = args.runmode
+# check the dates are legit
+if runtype=='historical':
+    try:
+        startDate = datetime.datetime.strptime(args.startDate,'%Y%m%d%H%M')
+        endDate = datetime.datetime.strptime(args.endDate,'%Y%m%d%H%M')
+    except:
+        print("ERROR: incorrect format for dates. Need to be YYYYMMDDhhmm")
+        sys.exit(1)   
+    # get date list
+    if endDate < startDate:
+        print("End date provided is before the start date!")
+        sys.exit(1) 
+    # round to nearest 15 minutes
+    round_sdate = fns.roundDate(startDate)
+    round_edate = fns.roundDate(endDate)
+    if round_sdate != startDate:
+         print("start date rounded to nearest interval matching raw data")
+         startDate = round_sdate
+    if round_edate != endDate:
+         print("start date rounded to nearest interval matching raw data")
+         endDate = round_edate
+    # get list of dates
+    dateList = fns.generate_dates(startDate,endDate,raw_tdelta)
+
+print("Running in "+runtype+" mode")
+print("Sending outputs to Africa Nowcast portal: "+str(args.toPortal))
+print("Processing using feed: "+args.feed)
 
 if runtype=='realtime':
    # mirror_path = '/scratch/NFLICS/sftp_extract/current'   # path to NCAS mirror 
@@ -64,6 +121,9 @@ else:
     #mirror_path = '/scratch/NFLICS/sftp_extract/current'
       #mirror_path = '/prj/nflics/real_time_data/2024/01/08/' # path to where historical NCAS raw data to process is held
 
+
+
+
 shadow_run=False
 ##################################################
 #Error handelling using the signal package
@@ -71,7 +131,7 @@ shadow_run=False
 import signal
 
 # run_offline: True saves data to /users/hymod/stewells/NFLICS/NFLICS_scw rather than operation folders
-run_offline = False
+run_offline = not args.toPortal
 
 alarm_length_ftp=60*5  #give the ftp 1 minute to work
 alarm_length_code=60*10 #give the code 10 minutes per .nc file (normal operational run - 1 nc file per 15 mins)
@@ -206,7 +266,8 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
 
     #feed="ncas"
     #feed = 'historical'
-    feed = 'eumdat'
+    #feed = 'eumdat'
+    feed = args.feed
     ukceh_mirror=False
     make_gif=False
     #overwrite = False
@@ -395,10 +456,20 @@ if runtype=='realtime':
         signal.alarm(0)
     a2=signal.alarm(alarm_length_code)
 else:
+    new_files = []
+    if fStruct=='direct':
+        new_files = [os.path.join(mirror_path,datetime.datetime.strftime(x,'IR_108_BT_%Y%m%d_%H%M.nc')) for x in dateList]
+    elif fStruct=='YMD':
+        new_files= [os.path.join(mirror_path,str(x.year),str(x.month).zfill(2),str(x.day).zfill(2),datetime.datetime.strftime(x,'IR_108_BT_%Y%m%d_%H%M.nc')) for x in dateList]
+    elif fStruct=='YM':
+        new_files= [os.path.join(mirror_path,str(x.year),str(x.month).zfill(2),datetime.datetime.strftime(x,'IR_108_BT_%Y%m%d_%H%M.nc')) for x in dateList]
+ 
+
+    # OLD VERSION
+    """
     #ts = ['01','06','07','08','09','10','11']
     #ts = [str(x).zfill(2) for x in range(2,7)]
     ts = ['07']
-    #ts = ['29']
     hrs = [str(x).zfill(2) for x in range(14)]
     #hrs = ['14']
     #mins = ['00']
@@ -409,13 +480,15 @@ else:
             for m in mins:
                 #new_files = new_files+[mirror_path+"/202207"+t+h+m+'.gra']
             	new_files=new_files+[mirror_path+"/IR_108_BT_202410"+t+"_"+h+m+'.nc']
-    print(new_files)
+    """
+    
     new_files  = [x for x in new_files if os.path.exists(x)]
     #new_files= glob.glob("/mnt/scratch/cmt/IR_108_BT_20240927_0015.nc")
     #new_files = glob.glob(mirror_path+"/202208141200.gra")
     new_files = sorted(new_files)
     print(new_files)
-#print(new_files)
+
+
 
 for new_file in new_files:
     if runtype=='realtime':
