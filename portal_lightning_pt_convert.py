@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 import rasterio, time
 from osgeo import gdal
 import glob,datetime
+import argparse
 
 # numbe rof flashes / 15 minutes - datestamp is start of 15 minutes
 #origin = 35.975S, 19.975W - lower left
@@ -37,16 +38,20 @@ testDir = '/home/stewells/AfricaNowcasting/dev/lightning/test_out'
 liveArchiveDir='/mnt/prj/nflics/lightning'
 testArchiveDir='/home/stewells/AfricaNowcasting/dev/lightning/test_out'
 
-mode = 'realtime'
-if len(sys.argv)>1: 
-    if sys.argv[1] in ['realtime','historical']:
-        mode = sys.argv[1]
-    else:
-        print("ERROR: Incorrect mode speficied. Must be either \'realtime\' or \'historical\'")
-        sys.exit(0) 
+# get arguments
+parser= argparse.ArgumentParser(description="Generate lightning point location files from MTG gridded data")
+# required arguments (positional)
+parser.add_argument("--mode", choices=["realtime","historical"], default="realtime",help="Run mode (real time or historical)")
+
+# datetimes for historical
+parser.add_argument("--startDate", type=str, help="Start Date (YYYYMMDDhhmm).")
+parser.add_argument("--endDate", type=str, help="Start Date (YYYYMMDDhhmm).")
+
+# to portal
+parser.add_argument("--toPortal", type=bool, default = True, help="Send data to portal (True) or local (False)")
+
+
 # if historical then load the start and end date
-
-
 def roundDate(dt,nmin=raw_tdelta):
     mins = (dt.minute // nmin)* nmin
     if dt.minute % nmin >= 7.5:
@@ -60,26 +65,30 @@ def generate_dates(start,end,interval):
         dateList.append(current)
         current+= delta
     return dateList
+# get the arguments
+args = parser.parse_args()
 
-if mode=='historical':
+# sort out directories to use
+
+if args.toPortal:
+    outDir = portalDir
+    archiveDir=liveArchiveDir
+else:
+    outDir= testDir
+    archiveDir=testArchiveDir
+
+# sort the dates out
+if args.mode =='historical':
+    if not args.startDate:
+        parser.error("Start date (--startDate) not specified for historical processing")
+    if not args.endDate:
+        parser.error("End date (--endDate) not specified for historical processing")
     try:
-        startDate = datetime.datetime.strptime(sys.argv[2],'%Y%m%d%H%M')
-        endDate = datetime.datetime.strptime(sys.argv[3],'%Y%m%d%H%M')
+        startDate = datetime.datetime.strptime(args.startDate,'%Y%m%d%H%M')
+        endDate = datetime.datetime.strptime(args.endDate,'%Y%m%d%H%M')
     except:
         print("ERROR: incorrect format for dates. Need to be YYYYMMDDhhmm")
         sys.exit(0)
-    try:
-        sendToPortal = int(sys.argv[4])
-    except:
-        sendToPortal = 1    
-
-    if sendToPortal==1:
-        outDir = portalDir
-        archiveDir=liveArchiveDir
-    else:
-        outDir= testDir
-        archiveDir=testArchiveDir
-
     if endDate < startDate:
         print("End date provided is before the start date!")
         sys.exit(0) 
@@ -98,7 +107,6 @@ if mode=='historical':
     fileList = [os.path.join(dataDir,x.strftime("%Y%m%d%H%M.gra")) for x in dateList]
     fileListArchive = [os.path.join(archiveDir,str(x.year),str(x.month).zfill(2),str(x.day).zfill(2),x.strftime("%Y%m%d%H%M.gra")) for x in dateList]
 
-
     # keep only those files that exist and store as dates
     exist_files = []
     for ix,ifile in enumerate(fileList):
@@ -113,22 +121,10 @@ if mode=='historical':
     
     
 
-elif mode=='realtime':
+elif args.mode=='realtime':
     # get recent files
     new_files = []
 
-    try:
-        sendToPortal = int(sys.argv[2])
-    except:
-        sendToPortal = 1   
-
-    if sendToPortal==1:
-        outDir = portalDir
-        archiveDir=liveArchiveDir
-    else:
-        outDir= testDir
-        archiveDir=testArchiveDir
-    
     t0 = datetime.datetime.today()
     #total_files=glob.glob(os.path.join(dataDir,str(t0.year),str(t0.month).zfill(2),'*.gra'))
     total_files=glob.glob(os.path.join(dataDir,'*.gra'))
