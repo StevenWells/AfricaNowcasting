@@ -8,7 +8,8 @@ import glob
 import xarray as xr
 import datetime, time
 import matplotlib.pyplot as plt
-
+import argparse
+import process_realtime_fns as fns   #will need to move this code into sftp_extract directory
 
 # Converts .gra soil moisture files into geotiff and sends them to thesans tranfer folder
 
@@ -39,15 +40,33 @@ import matplotlib.pyplot as plt
 #  SCW 13 Mar 2023     Generalised coordinates by introducing domain argument which picks out parameters from domainPars dictionary
 
 
-runtype=sys.argv[1]
-# realtime - get list of files based on those most recently updated
-# historical - get list of files based on a pattern match 
-domain = sys.argv[2]
-# domain will define shape of array being read in 
-# should be either 'WA'=West Africa  or 'SSA' = Sub-saharam africa
+# SAN transfer folder
+outPath = '/mnt/HYDROLOGY_stewells/geotiff/lawis_soil_moisture_anomaly/'
+###
+outPathBackup ='/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data/'
+
+
+# get arguments
+parser= argparse.ArgumentParser(description="Generate soil moisture anomaly data from .gra files")
+
+# mode (default realtime)
+parser.add_argument("--mode", choices=["realtime","historical"], default="realtime",help="Run mode (real time or historical)")
+
+# datetimes for historical
+parser.add_argument("--startDate", type=str, help="Start Date (YYYYMMDDhhmm).")
+parser.add_argument("--endDate", type=str, help="Start Date (YYYYMMDDhhmm).")
+
+# output directory, to be used if different from the SAN. Defaults to SAN
+parser.add_argument("--outDir", type=str, default = outPath, help="Directory to send outputs to (defaults to SAN)")
+
+#domain
+parser.add_argument("--domain", choices=["WA","SSA"], default="SSA",help="Domain: West Africa (WA) or Sub-Saharan Africa (SSA)")
+
+# load them
+args = parser.parse_args()
 
 # path to source
-if domain=='WA':
+if args.domain=='WA':
     sourcePath = '/mnt/prj/swift/ASCAT_cmt/NRT_anomalies/'
 else:
     sourcePath = '/mnt/prj/swift/ASCAT_SSA/NRT_anomalies/'
@@ -59,12 +78,7 @@ domainPars = {'WA':{'nx_raw':274,'ny_raw':162,'deltax':0.25,'xll':-18.125,'yll':
 # backup output folder if satdev is down
 toSdir = False
 
-# SANS transfer folder
 
-#outPath = '/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data/'
-outPath = '/mnt/HYDROLOGY_stewells/geotiff/lawis_soil_moisture_anomaly/'
-#outPath = '/home/stewells/AfricaNowcasting/satTest/geotiff/lawis_soil_moisture_anomaly/'
-outPathBackup ='/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data/'
 
 # projections
 origEPSG='4326'
@@ -72,9 +86,39 @@ newEPSG='3857'
 
 # cron fequency (minutes)
 cronFreq = 15
+# sort the dates out
+if args.mode =='historical':
+    if not args.startDate:
+            parser.error("Start date (--startDate) not specified for historical processing")
+    if not args.endDate:
+        parser.error("End date (--endDate) not specified for historical processing")
+    try:
+        startDate = datetime.datetime.strptime(args.startDate,'%Y%m%d')
+        endDate = datetime.datetime.strptime(args.endDate,'%Y%m%d')
+    except:
+        print("ERROR: incorrect format for dates. Need to be YYYYMMDDhhmm")
+        sys.exit(0)
+    if endDate < startDate:
+        print("End date provided is before the start date!")
+        sys.exit(0) 
+    # round to nearest 15 minutes
+    round_sdate = fns.roundDate(startDate)
+    round_edate = fns.roundDate(endDate)
+    if round_sdate != startDate:
+        print("start date rounded to nearest interval matching raw data")
+        startDate = round_sdate
+    if round_edate != endDate:
+        print("start date rounded to nearest interval matching raw data")
+        endDate = round_edate
+    # get list of dates (Soil moisture is daily)
+    dateList = fns.generate_dates(startDate,endDate,1440)
 
-if runtype=='historical':
-    all_files=glob.glob('/mnt/prj/swift/ASCAT_SSA/NRT_anomalies/202303/ASCAT_dsm_20230313*')
+    # get list of files
+    all_files = []
+    for x in dateList:
+        all_files+=glob.glob(os.path.join(sourcePath,x.strftime("%Y%m"),x.strftime('ASCAT_dsm_%Y%m%d_*')))
+
+    #all_files=glob.glob('/mnt/prj/swift/ASCAT_SSA/NRT_anomalies/202303/ASCAT_dsm_20230313*')
 else: # realtime - this has all the files that were modified since the last time the cron job was run
       #if the file was editd in that time, update it (or add if new
     all_files = []
@@ -93,16 +137,17 @@ for root in all_files:
     filename = os.path.basename(root)
     print(filename)
     dateStr = filename.split('_')[2]
-    nx_raw=domainPars[domain]['nx_raw']
-    ny_raw=domainPars[domain]['ny_raw']
-    deltax=domainPars[domain]['deltax']
-    xll = domainPars[domain]['xll']
-    yll=domainPars[domain]['yll']
+    nx_raw=domainPars[args.domain]['nx_raw']
+    ny_raw=domainPars[args.domain]['ny_raw']
+    deltax=domainPars[args.domain]['deltax']
+    xll = domainPars[args.domain]['xll']
+    yll=domainPars[args.domain]['yll']
 
     if toSdir:
         outdir= outPathBackup
     else:
-        outdir = os.path.join(outPath,dateStr)
+        #outdir = os.path.join(outPath,dateStr)
+        outdir = os.path.join(args.outDir,dateStr)
     rasFile = filename.split('.')[0]+'.tif'
     reprojFile = filename.split('.')[0]+'_'+str(newEPSG)+'.tif'
     print(outdir)
