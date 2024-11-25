@@ -9,24 +9,55 @@ import numpy as np
 from osgeo import gdal
 import u_interpolate as uinterp
 from plot_source_destination_functions import *
+import argparse
 
 # SCW 2024 01 06 (version 2) include creation of additional rainfall accumulation maps
 # SCW 2024 02 02 (version 3) include  option to output point values at list of lcoations (givnen in lat-long)
+# SCW 2024 11 25 (version 4) control variables from command line and include hsitircal processing option
+
+# SAN
+outRoot = '/mnt/HYDROLOGY_stewells/geotiff/'
+
+#ARGUMENTS
+parser= argparse.ArgumentParser(description="Collect HSAF precipitation data and convert to GeoTIFF for Nowcasting portal")
+parser.add_argument("--mode", choices=["realtime","historical"], default="realtime",help="Run mode (real time or historical)")
+# datetimes for historical
+parser.add_argument("--startDate", type=str, help="Start Date (YYYYMMDDhhmm).")
+parser.add_argument("--endDate", type=str, help="Start Date (YYYYMMDDhhmm).")
+# to portal
+parser.add_argument("--outDir", type=str, default = outRoot, help="Folder to send output GeoTIFF files")
+# make accumulations?
+parser.add_argument("--makeAccumulations", type=bool, default = True, help="Create accumulation GeoTIFF in addition to rates")
+# reprocess data if already made
+parser.add_argument("--reprocess", type=bool, default = False, help="Reprocess data even if GeoTIFF already exists")
+# point values
+parser.add_argument("--getPoints", type=bool, default = False, help="Create csv files of specific point values")
+# keep full MSG data
+parser.add_argument("--keepMSG", type=bool, default = True, help="Keep and archive the full MSG data")
+
+# TODO make this an external file, although not used at the moment so low priority
+# get the arguments
+args = parser.parse_args()
 
 # VARIABLES
+# these are now stored in command line arguments
+#make_accumulations = True
+# keep full msg images
+#keep_fullmsg = True
+#rerun even if already processed
+#reprocess_data=False
+# make point value file
+#do_point_vals = False
 
-make_accumulations = True
+print("Reprocessing pre-generated data: "+str(args.reprocess))
+print("Sending GeoTIFFs to: "+str(args.outDir))
+print("Generating accumulation GeoTIFFs: "+str(args.makeAccumulations))
 # transfer search time(hours) - hours since now to search for files on HSAF ftp
 search_hours=3
-# keep full msg images
-keep_fullmsg = True
-#rerun even if already processed
-reprocess_data=False
-# make point value file
-do_point_vals = False
-
 # use backup output dir
 toSdir = False
+
+raw_tdelta=15
 
 # Path to raw archive (data pulled down from HSAF - probably will be simplified as will delete these on the fly
 rawArchive = '/mnt/prj/nflics/NRT_HSAF/precip_h60/full_msg/'
@@ -99,7 +130,7 @@ class extendedCoreCalc():
         data_interp_ex=uinterp.interpolate_data(self.data_all_ex, inds_ex, weights_ex, new_shape_ex)
        # plt.imshow(data_interp_ex)
        # plt.show()
-        if do_point_vals:
+        if args.getPoints:
             pt_locn_locs_fixed = [[(np.abs(blobs_lats_ex[:]-pt_locn_locs[iloc][0])).argmin(),\
                         (np.abs(blobs_lons_ex[:]-pt_locn_locs[iloc][1])).argmin()] for iloc in range(len(pt_locn_names))]	
             rvals =[]
@@ -108,15 +139,17 @@ class extendedCoreCalc():
             csvfile= '/mnt/prj/nflics/nflics_nowcasts/'+self.tnowdt.strftime('%Y/%m/%d/%H%M/')+'Site_HSAF_'+self.tnowdt.strftime('%Y%m%d%H%M')+'.csv'
             write_site_cores(csvfile,pt_locn_names,pt_locn_locs,rvals)
         if self.do_geotiff:
-            if not os.path.exists(self.plotdir):
-                os.mkdir(self.plotdir)
+            fullplotdir = os.path.join(self.plotdir,'ssa_hsaf_precip',self.tnow[:8])  
+
+            if not os.path.exists(fullplotdir):
+                os.mkdir(fullplotdir)
             rasPath = os.path.join(self.tmpdir,"HSAF_precip_h60_"+self.tnow+"_SSA.tif")
-            rasPath_3857 = self.plotdir+"/HSAF_precip_h60_SSA_"+self.tnow+"_3857.tif"
+            rasPath_3857 = fullplotdir+"/HSAF_precip_h60_SSA_"+self.tnow+"_3857.tif"
             print(rasPath_3857)
             make_geoTiff([data_interp_ex],rasPath,reprojFile=rasPath_3857,trim=True)
             os.system('rm '+rasPath)
 			
-            if make_accumulations:
+            if args.makeAccumulations:
                 update_accumulations(data_interp_ex,self.tnow,self.plotdir,self.tmpdir,inds_ex, weights_ex, new_shape_ex)
 				
 				
@@ -171,7 +204,8 @@ def update_accumulations(hsafNow,tnow,plotdir,tmpdir,inds_ex, weights_ex, new_sh
                 geotiff_outpath_acc = '/mnt/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data/'
             else:
             #geotiff_outpath_acc = os.path.join('/home/stewells/AfricaNowcasting/satTest/geotiff/ssa_hsaf_precip_accum',tnowS)
-                geotiff_outpath_acc = os.path.join('/mnt/HYDROLOGY_stewells/geotiff/ssa_hsaf_precip_accum',tnowS[:8])
+                # geotiff_outpath_acc = os.path.join('/mnt/HYDROLOGY_stewells/geotiff/ssa_hsaf_precip_accum',tnowS[:8])
+                geotiff_outpath_acc = os.path.join(plotdir,'ssa_hsaf_precip_accum',tnowS[:8])
             if not os.path.exists(geotiff_outpath_acc):
                 os.makedirs(geotiff_outpath_acc)
             rasPath = os.path.join(tmpdir,"HSAF_precip_acc"+str(acchr)+"h_"+tnowS+"_SSA.tif")
@@ -280,37 +314,104 @@ def process_grid_info(nx,ny,nx_dakarstrip,ny_dakarstrip,blob_dx,plot_area,nflics
     return(ds)
 
 
-# get data from HSAF
+# if historical then load the start and end date
+def roundDate(dt,nmin=raw_tdelta):
+    mins = (dt.minute // nmin)* nmin
+    if dt.minute % nmin >= 7.5:
+        mins+=nmin
+    return dt.replace(minute=0,second=0,microsecond=0)+datetime.timedelta(minutes=mins)
+def generate_dates(start,end,interval):
+    dateList = []
+    current = start
+    delta = datetime.timedelta(minutes =interval)
+    while current <= end:
+        dateList.append(current)
+        current+= delta
+    return dateList
 
-# get surrent list of files
-#currentData
-# get list of files from last n hours to look for
-dateNow = datetime.datetime.now()
-# nearest 15 minute to now
-dateNow = dateNow+ (datetime.datetime.min - dateNow)%(datetime.timedelta(minutes=15)) 
-# get list of last n hours
-datelist = [dateNow - n*datetime.timedelta(minutes=15)  for n in range(4*search_hours)]
-filelist = [datetime.datetime.strftime(x,'ftp://ftphsaf.meteoam.it:/h60/h60_cur_mon_data/h60_%Y%m%d_%H%M_fdk.nc.gz') for x in datelist]
+# get data from HSAF or hisrotical
+if args.mode =='historical':
+    if not args.startDate:
+        parser.error("Start date (--startDate) not specified for historical processing")
+    if not args.endDate:
+        parser.error("End date (--endDate) not specified for historical processing")
+    try:
+        startDate = datetime.datetime.strptime(args.startDate,'%Y%m%d%H%M')
+        endDate = datetime.datetime.strptime(args.endDate,'%Y%m%d%H%M')
+    except:
+        print("ERROR: incorrect format for dates. Need to be YYYYMMDDhhmm")
+        sys.exit(0)
+    if endDate < startDate:
+        print("End date provided is before the start date!")
+        sys.exit(0) 
+    # round to nearest 15 minutes
+    round_sdate = roundDate(startDate)
+    round_edate = roundDate(endDate)
+    if round_sdate != startDate:
+         print("start date rounded to nearest interval matching raw data")
+         startDate = round_sdate
+    if round_edate != endDate:
+         print("start date rounded to nearest interval matching raw data")
+         endDate = round_edate
+    # get list of dates
+    dateList = generate_dates(startDate,endDate,15)
+
+    # make into a file list
+
+    fileList  = [os.path.join(rawArchive,str(ifile.year),str(ifile.month).zfill(2),
+                 datetime.datetime.strftime(ifile,'h60_%Y%m%d_%H%M_fdk.nc.gz')) for ifile in dateList]
+    # If files dont exist try and download. Then keep only those files that exist in the list
+    # keep only those files that exist and store as dates
+    exist_files = []
+    exist_dates = []
+    for ix,ifile in enumerate(fileList):
+        if os.path.exists(ifile):
+            if args.reprocess: # file exists and want to reprocess
+                exist_files+=[ifile]
+                exist_dates+=[dateList[ix]]
+        else:
+            # trya nd download
+            dlDir = os.path.join(rawArchive,str(dateList[ix].year),str(dateList[ix].month).zfill(2)) 
+            hfile = datetime.datetime.strftime(dateList[ix],'ftp://ftphsaf.meteoam.it:/h60/h60_cur_mon_data/h60_%Y%m%d_%H%M_fdk.nc.gz')
+            os.system('wget -P '+dlDir+' -nc '+hfile)
+            # check again if downloaded
+            if os.path.exists(ifile): # dont need args.reprocess as this is coming from a new file so wont have been 
+                exist_files+=[ifile]
+                exist_dates+=[dateList[ix]]
+
+    rfiles = exist_files
+    print("Files to process: "+str(len(rfiles)))
+    # exist_files contains a list of files that exist
+    # exist_dates contains the corresponding set of dates
+elif args.mode=='realtime':
+    # get surrent list of files
+    #currentData
+    # get list of files from last n hours to look for
+    dateNow = datetime.datetime.now()
+    # nearest 15 minute to now
+    dateNow = dateNow+ (datetime.datetime.min - dateNow)%(datetime.timedelta(minutes=15)) 
+    # get list of last n hours
+    datelist = [dateNow - n*datetime.timedelta(minutes=15)  for n in range(4*search_hours)]
+    filelist = [datetime.datetime.strftime(x,'ftp://ftphsaf.meteoam.it:/h60/h60_cur_mon_data/h60_%Y%m%d_%H%M_fdk.nc.gz') for x in datelist]
 #datelist = [dateNow - 4*datetime.timedelta(minutes=15)]
 #filelist = [datetime.datetime.strftime(x,'ftp://ftphsaf.meteoam.it:/h60/h60_cur_mon_data/h60_%Y%m%d_%H%M_fdk.nc.gz') for x in datelist]
 
 ##filelist = ['ftp://ftphsaf.meteoam.it:/h60/h60_cur_mon_data/h60_20240201_1000_fdk.nc.gz']
+    rfiles = []
+    for ifile,hfile in enumerate(filelist):
+        newfileDir =os.path.join(dataDir,str(datelist[ifile].year),str(datelist[ifile].month).zfill(2))
+        newfileDir_raw= os.path.join(rawArchive,str(datelist[ifile].year),str(datelist[ifile].month).zfill(2))
+        os.makedirs(newfileDir,exist_ok=True)
+        os.makedirs(newfileDir_raw,exist_ok=True)
 
-rfiles = []
-for ifile,hfile in enumerate(filelist):
-    newfileDir =os.path.join(dataDir,str(datelist[ifile].year),str(datelist[ifile].month).zfill(2))
-    newfileDir_raw= os.path.join(rawArchive,str(datelist[ifile].year),str(datelist[ifile].month).zfill(2))
-    os.makedirs(newfileDir,exist_ok=True)
-    os.makedirs(newfileDir_raw,exist_ok=True)
-
-    # check if file has been processed already 
-    if not os.path.exists(os.path.join(newfileDir,datetime.datetime.strftime(datelist[ifile],'h60_%Y%m%d_%H%M_fdk_ssa.nc'))) or reprocess_data:
-        os.system('wget -P '+newfileDir_raw+' -nc '+hfile)
-    # now check again to see if it has been pulled down
-        if os.path.exists(os.path.join(newfileDir_raw,datetime.datetime.strftime(datelist[ifile],'h60_%Y%m%d_%H%M_fdk.nc.gz'))):
-            rfiles+=[os.path.join(newfileDir_raw,datetime.datetime.strftime(datelist[ifile],'h60_%Y%m%d_%H%M_fdk.nc.gz'))]
-    else:
-        print(hfile+' already processed')
+        # check if file has been processed already 
+        if not os.path.exists(os.path.join(newfileDir,datetime.datetime.strftime(datelist[ifile],'h60_%Y%m%d_%H%M_fdk_ssa.nc'))) or args.reprocess:
+            os.system('wget -P '+newfileDir_raw+' -nc '+hfile)
+        # now check again to see if it has been pulled down
+            if os.path.exists(os.path.join(newfileDir_raw,datetime.datetime.strftime(datelist[ifile],'h60_%Y%m%d_%H%M_fdk.nc.gz'))):
+                rfiles+=[os.path.join(newfileDir_raw,datetime.datetime.strftime(datelist[ifile],'h60_%Y%m%d_%H%M_fdk.nc.gz'))]
+        else:
+            print(hfile+' already processed')
 
 
 ##rfiles = ['/prj/nflics/NRT_HSAF/precip_h60/full_msg/2024/02/h60_20240201_1000_fdk.nc.gz']
@@ -340,7 +441,8 @@ for rfile in rfiles:
                     geotiff_outpath = '/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data/'
                 else:
                 #geotiff_outpath = os.path.join('/home/stewells/AfricaNowcasting/satTest/geotiff/ssa_hsaf_precip',tnowStr)
-                    geotiff_outpath = os.path.join('/mnt/HYDROLOGY_stewells/geotiff/ssa_hsaf_precip',tnowStr)
+                    geotiff_outpath = args.outDir
+                    #geotiff_outpath = os.path.join('/mnt/HYDROLOGY_stewells/geotiff/ssa_hsaf_precip',tnowStr)
                 #geotiff_outpath = os.path.join('/mnt/HYDROLOGY_stewells/geotiff/ssa_hsaf_precip',tnowStr)
                 print("Processing HSAF data for "+datetime.datetime.strftime(tnow,"%Y-%m-%d %H:%M")) 
                 use_times=[tnow]
@@ -384,7 +486,7 @@ for rfile in rfiles:
     except Exception as e:
         print("Error processing file "+rfile)
         print(e)
-    if not keep_fullmsg:
+    if not args.keepMSG:
         os.system('rm '+rfile)
 
        # except Exception as e:
