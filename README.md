@@ -76,3 +76,16 @@ usage: portal_hsafprecip_convert.py [-h] [--mode {realtime,historical}]<br />&nb
 `--reprocess`: Boolean argument. If `True`, reprocess the file even if it has already been processed. Default is `False`. Useful for infilling historical data where missing data is intermittent.<br />
 `--getPoints`: Boolean argument. Extract values of rainfall rate from image at set of (hard-coded) locations and save to .csv file. Default is `False`. <br />
 `keepMSG`: Boolean argument. Retain the full domain image as downloaded from the HSAF sftp and archive. Default is `True`.
+
+
+### Land Modification Factor
+
+This product provides a quantitative estimate of how the likelihood of intense convective rainfall is modified by the land surface. It is derived from a combination of daytime Land Surface Temperature (LST) anomalies, observed from Meteosat Second Generation (MSG), and historical data encapsulating the statistical relationships between convective cores and LST anomalies (LSTA). The raw .gra files are converted into GeoTIFF for display on the Africa Noecasting portal.
+
+Script: **lmf_convert.sh** 
+
+Usage: ./lmf_convert.sh [-m, --mode] [-d, --outdir] [-s, --startDir] [-e, --enddir]<br /><br />
+`[-m, --mode]`: Pick up most recent files (`realtime`) or process older files based upon a date range (`historical`)<br />
+`[-s, --startDate]`: Start date for historical processing (only necessary if running in historical mode ). Format is  YYYYMMDDm<br />
+`[-e, --endDate]`: Start date for historical processing (only necessary if running in historical mode ). Format is YYYYMMDD<br />
+`[-d, --outDir]`: Explicity define a path to output the data to. If not included, defaults to the Lancaster SAN for display on the portal. Note that the files will be contained within the a subdirectory of `outDir` based on the year and month of the file. <br />

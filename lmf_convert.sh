@@ -25,37 +25,138 @@
 #   
 
 # output directory (NB this directory is used to then move the files across to Lancaster SANS)
-#root="/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data/"
-#root="/home/stewells/AfricaNowcasting/satTest/geotiff/lawis_lmf/"
+
 date
-root="/mnt/HYDROLOGY_stewells/geotiff/lawis_lmf/"
-wdir="/home/stewells/AfricaNowcasting/tmp/"
 # load conda environment
 source /etc/profile.d/conda.sh
 conda activate py37
-
 # Move to workign directory (this script)
 cd /home/stewells/AfricaNowcasting/rt_code/
-
 # set up GDAL parameters
 export GDAL_NETCDF_BOTTOMUP=NO
+
+
+# fixed variables
+indir="/mnt/prj/nflics/LMF_output_probabilities/"
+file_prefix="prob_vn2a_"
+file_suffix=".gra"
+tmpdir="/home/stewells/AfricaNowcasting/tmp/"
 nodata_value=-999
 
+# default argument values
+mode="realtime"
+outdir="/mnt/HYDROLOGY_stewells/geotiff/lawis_lmf/"
+startDate=""
+endDate=""
 
-# pick up files modified in the last 20 minutes
-# FILES=$(find /prj/nflics/LMF_output_probabilities -regextype posix-egrep -regex ".*prob_vn2b_.*[0-9]+.gra" -type f -mmin -20)
-FILES=$(find /mnt/prj/nflics/LMF_output_probabilities -regextype posix-egrep -regex ".*prob_vn2a_.*[0-9]+.gra" -type f -mmin -20)
 
+
+OPTS=$(getopt -o m:d:s:e:h --long mode:,outdir:,startDate:,endDate:,help -n "date_parsing.sh" -- "$@")
+if [[ $? -ne 0 ]]; then
+  echo "Error parsing arguments" >&2
+  exit 1
+fi
+# Rearrange arguments as returned by getopt
+eval set -- "$OPTS"
+# Parse the options
+while true; do
+  case "$1" in
+    -m|--mode)
+      mode="$2"
+      shift 2 ;;
+    -d|--outdir)
+      outdir="$2"
+      shift 2 ;;
+    -s|--startDate)
+      startDate="$2"
+      shift 2 ;;
+    -e|--endDate)
+      endDate="$2"
+      shift 2 ;;
+    -h|--help)
+      echo "Usage: $0 [-a value] [-b value] [-c value]"
+      echo "Defaults:"
+      echo "  -m, --mode: $arg_a"
+      echo "  -d, --outdir: $arg_b"
+      echo "  -s, --startDir: $arg_c"
+      echo "  -e, --endDir: $arg_c"
+      exit 0 ;;
+    --)
+      shift
+      break ;;
+    *)
+      echo "Invalid option: $1" >&2
+      exit 1 ;;
+  esac
+done
+
+
+# make sure output and input dir have a trailing "/"
+[[ "${indir: -1}" != "/" ]] && indir="$indir/"
+[[ "${outdir: -1}" != "/" ]] && outdir="$outdir/"
+
+# get the files
+if [[ "$mode" == "realtime" ]]; then
+	# pick up files modified in the last 20 minutes
+	# FILES=$(find /prj/nflics/LMF_output_probabilities -regextype posix-egrep -regex ".*prob_vn2b_.*[0-9]+.gra" -type f -mmin -20)
+	#FILES=$(find /mnt/prj/nflics/LMF_output_probabilities -regextype posix-egrep -regex ".*prob_vn2a_.*[0-9]+.gra" -type f -mmin -20)
+	FILES=($(find "$indir" -regextype posix-egrep -regex ".*prob_vn2a_.*[0-9]+.gra" -type f -mmin -20))
+	echo "Files to process (realtime): ${#FILES[@]}"
+
+elif  [[ "$mode" == "historical" ]]; then
+    # sort dates out
+    # Validate date format using regex
+    if ! [[ "$startDate" =~ ^[0-9]{4}[0-9]{2}[0-9]{2}$ && "$endDate" =~ ^[0-9]{4}[0-9]{2}[0-9]{2}$ ]]; then
+        echo "Invalid date format. Please use YYYYMMDD."
+        exit 1
+    fi
+    # Convert dates to seconds since epoch for comparison
+    start_epoch=$(date -d "$startDate" +%s 2>/dev/null)
+    end_epoch=$(date -d "$endDate" +%s 2>/dev/null)
+
+    if [ -z "$start_epoch" ] || [ -z "$end_epoch" ]; then
+        echo "Error: Invalid date(s) provided."
+        exit 1
+    fi
+    # Ensure start_date is less than or equal to end_date
+    if [ "$start_epoch" -gt "$end_epoch" ]; then
+        echo "Error: Start date must be earlier than or equal to end date."
+        exit 1
+    fi
+
+    # Generate and print dates
+    dates=()
+    files=()
+    current_date="$startDate"
+    while [ "$(date -d "$current_date" +%s)" -le "$end_epoch" ]; do
+        dates+=("$current_date")
+        files+=("$indir$file_prefix$current_date$file_suffix")
+        current_date=$(date -d "$current_date +1 day" +%Y%m%d)
+    done
+    
+    # existing files
+    FILES=()
+    for file in "${files[@]}"; do
+        if [[ -e "$file" ]]; then
+            FILES+=("$file")
+        fi
+    done
+    echo "Files to process: ${#FILES[@]}"
+else 
+    echo "Error incorrect option for mode. Allowed values are 'realtime' or 'historical'"
+    exit 1
+fi
+
+
+# PROCESS EACH FILE IN LIST
 shopt -s nullglob
+echo $FILES
 for FFILE in $FILES
 do
 fullfile="$FFILE"
-
-
 echo `date`
 echo $fullfile
 #fullfile=$1
-
 
 # get all necessary grids as netCDFs (set of 6 files created from .gra file for each lead time - they get pulled out into separate netCDF files)
 python portal_lmf_convert.py $fullfile
@@ -70,18 +171,15 @@ for VALIDTIME in prob*nc
 do
 suffix='.nc'
 
-
-
-
 ncFile=$VALIDTIME
 newfile=${VALIDTIME%"$suffix"}.tif
 
 #tidy up and straggling temporary files prior to calculating
-rm $wdir'tmp_lmf'*tif
-rm $wdir'tmp_lmf'*.vrt
+rm $tmpdir'tmp_lmf'*tif
+rm $tmpdir'tmp_lmf'*.vrt
 
-tmptif=$wdir'tmpfile_lmf.tif'
-tmpvrt=$wdir'tmpfile2_lmf.vrt'
+tmptif=$tmpdir'tmpfile_lmf.tif'
+tmpvrt=$tmpdir'tmpfile2_lmf.vrt'
 
 # COnvert each file to GeoTIFF (currently no geolocation information - need to get from SEVIRILST_WA_geoloc.nc)
 gdal_calc.py --format=GTiff --type=Float32 \
@@ -125,8 +223,8 @@ rm $ncFile
 # get date folder
 bfile=(${newfile//_/ })
 ddir=${bfile[2]}
-mkdir -p $root$ddir
-finalout=$root$ddir/$newfile
+mkdir -p $outdir$ddir
+finalout=$outdir$ddir/$newfile
 
 
 
