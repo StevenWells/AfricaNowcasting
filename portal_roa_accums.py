@@ -57,6 +57,19 @@ def make_geoTiff(data,rasFile,doReproj = True,origEPSG='4326',newEPSG='3857',rep
 
     os.system('rm '+rasFile2)
 
+def roundDate(dt,nmin=15):
+    mins = (dt.minute // nmin)* nmin
+    if dt.minute % nmin >= 7.5:
+        mins+=nmin
+    return dt.replace(minute=0,second=0,microsecond=0)+datetime.timedelta(minutes=mins)
+def generate_dates(start,end,interval):
+    dateList = []
+    current = start
+    delta = datetime.timedelta(minutes =interval)
+    while current <= end:
+        dateList.append(current)
+        current+= delta
+    return dateList
 
 def getAccs(tnow,accPeriods,dataDir,tmpDir,geotiffDir):
     print("Generating accumulations for "+str(tnow))
@@ -109,16 +122,22 @@ def getAccs(tnow,accPeriods,dataDir,tmpDir,geotiffDir):
 
 if __name__ == '__main__':
 
-    parser=argparse.ArgumentParser(prog='roa_accs.py')
-    parser.add_argument('--date',type=str,default=testDate,help='date of T0 file to process accumulations up to (YYYYMMDDhhmm)')
+    parser=argparse.ArgumentParser(prog='portal_roa_accums.py')
+    parser.add_argument("--mode", choices=["realtime","historical"], default="realtime",help="Run mode (real time or historical)")
+    parser.add_argument("--startDate", type=str, help="Start Date of T0 file (YYYYMMDDhhmm).")
+    parser.add_argument("--endDate", type=str, help="Start Date of T0 file (YYYYMMDDhhmm).")
     parser.add_argument('--dataDir',type=str,default=dataDir,help='directory to process ROA files from')
     parser.add_argument('--tmpDir',type=str,default=tmpDir,help='directory to hold temporary files')
     parser.add_argument('--geotiffDir',type=str,default=geotiffDir,help='directory to save outputs geoTiffs')
+    parser.add_argument('--reprocess',type=bool,default=False,help='Reprocess file if it already exists')
+
     args=parser.parse_args()
     tmpDir = args.tmpDir
     dataDir= args.dataDir
     geotiffDir = args.geotiffDir
-    tnow = args.date
+    mode = args.mode
+    reprocess = args.reprocess
+
 
     if not os.path.exists(dataDir):
             print("dataDir not found: "+dataDir)
@@ -130,25 +149,55 @@ if __name__ == '__main__':
             print("geotiffDir not found: "+geotiffDir)
             sys.exit(91)
 
-    # get most recent files
-    new_files = []
-    cronFreq=20
-    t0 = datetime.datetime.today()
+    if mode=='realtime':
+        # get most recent files
+        new_files = []
+        cronFreq=20
+        t0 = datetime.datetime.today()
 
-    total_files=glob.glob(os.path.join(dataDir,str(t0.year),str(t0.month).zfill(2),'MSG3*nc'))
-    for f in total_files:
-        modTimesinceEpoc = os.path.getmtime(f)
-        modificationTime = datetime.datetime.fromtimestamp(time.mktime(time.localtime(modTimesinceEpoc)))
-        if modificationTime > datetime.datetime.today()-datetime.timedelta(minutes=cronFreq):
-            # now check to see if already processed?
-            idate = f.split('/')[-1].split('-')[0][4:]
-            itime = f.split('/')[-1].split('-')[1][1:]
-            tiffPath = os.path.join(geotiffDir,idate[:8],'rainoverAfrica_SSA_'+idate+itime+'_acc72h_3857.tif')
-            if not os.path.exists(tiffPath): 
-                
-#               only include if not already processed
-                new_files.append(idate+itime)
-    if len(new_files)==0:
-        print("No new files to process")
+        total_files=glob.glob(os.path.join(dataDir,str(t0.year),str(t0.month).zfill(2),'MSG3*nc'))
+        for f in total_files:
+            modTimesinceEpoc = os.path.getmtime(f)
+            modificationTime = datetime.datetime.fromtimestamp(time.mktime(time.localtime(modTimesinceEpoc)))
+            if modificationTime > datetime.datetime.today()-datetime.timedelta(minutes=cronFreq):
+                # now check to see if already processed?
+                idate = f.split('/')[-1].split('-')[0][4:]
+                itime = f.split('/')[-1].split('-')[1][1:]
+                tiffPath = os.path.join(geotiffDir,idate[:8],'rainoverAfrica_SSA_'+idate+itime+'_acc72h_3857.tif')
+                if reprocess or not os.path.exists(tiffPath):
+                    new_files.append(idate+itime)
+
+
+        if len(new_files)==0:
+            print("No new files to process")
+    elif mode == 'historical':
+        if not args.startDate:
+            parser.error("Start date (--startDate) not specified for historical processing")
+        if not args.endDate:
+            parser.error("End date (--endDate) not specified for historical processing")
+        try:
+            startDate = datetime.datetime.strptime(args.startDate,'%Y%m%d%H%M')
+            endDate = datetime.datetime.strptime(args.endDate,'%Y%m%d%H%M')
+        except:
+            print("ERROR: incorrect format for dates. Need to be YYYYMMDDhhmm")
+            sys.exit(0)
+        if endDate < startDate:
+            print("End date provided is before the start date!")
+            sys.exit(0) 
+        # round to nearest 15 minutes
+        round_sdate = roundDate(startDate)
+        round_edate = roundDate(endDate)
+        if round_sdate != startDate:
+            print("start date rounded to nearest interval matching raw data")
+            startDate = round_sdate
+        if round_edate != endDate:
+            print("start date rounded to nearest interval matching raw data")
+            endDate = round_edate
+        # get list of dates
+        dateList = generate_dates(startDate,endDate,15)
+        new_files = [x.strftime('%Y%m%d%H%M') for x in dateList if reprocess or not os.path.exists(os.path.join(geotiffDir,x.strftime("%Y%m%d"),x.strftime('rainoverAfrica_SSA_%Y%m%d%H%M_acc1h_3857.tif')))]
+
+    print(new_files)
     for rundate in new_files:
+        #print(rundate)
         getAccs(rundate,accPeriods,dataDir,tmpDir,geotiffDir)
