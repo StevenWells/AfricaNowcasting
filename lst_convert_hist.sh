@@ -10,10 +10,22 @@ cd /home/stewells/AfricaNowcasting/rt_code
 export GDAL_NETCDF_BOTTOMUP=NO
 #nodata_value=9.969209999999999e+36
 nodata_value=9.96920996838687e+36 
-
 #nodata_value=9969209968386869046778552952102584320.0
 large_value=9.00000e+10
 # argument to script = full path to NETCDF file
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # get list of files edited 
 FILES=$(find  /mnt/prj/swift/SEVIRI_LST/lsta_ssa/nrt/202407/LSASAF*20240716*)

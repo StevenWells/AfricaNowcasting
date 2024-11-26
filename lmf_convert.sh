@@ -74,12 +74,12 @@ while true; do
       endDate="$2"
       shift 2 ;;
     -h|--help)
-      echo "Usage: $0 [-a value] [-b value] [-c value]"
+      echo "Usage: $0 [-m mode] [-d outdir] [-s startDate] [-e endDate]"
       echo "Defaults:"
-      echo "  -m, --mode: $arg_a"
-      echo "  -d, --outdir: $arg_b"
-      echo "  -s, --startDir: $arg_c"
-      echo "  -e, --endDir: $arg_c"
+      echo "  -m, --mode: $mode"
+      echo "  -d, --outdir: $outdir"
+      echo "  -s, --startDate: $startDate"
+      echo "  -e, --endDate: $endDate"
       exit 0 ;;
     --)
       shift

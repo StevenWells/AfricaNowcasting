@@ -88,7 +88,7 @@ Usage: portal_hsafprecip_convert.py [-h] [--mode {realtime,historical}]<br />&nb
 `--makeAccumulations`: Boolean argument. In addition to precipitation rate for that timestamp, generate the accumulated rainfall for 1hr, 3hr, 6hr, 12hr, 24hr and 72hr prior to that timestamp. Default is `True`. <br />
 `--reprocess`: Boolean argument. If `True`, reprocess the file even if it has already been processed. Default is `False`. Useful for infilling historical data where missing data is intermittent.<br />
 `--getPoints`: Boolean argument. Extract values of rainfall rate from image at set of (hard-coded) locations and save to .csv file. Default is `False`. <br />
-`keepMSG`: Boolean argument. Retain the full domain image as downloaded from the HSAF sftp and archive. Default is `True`. <br /> <br />
+`--keepMSG`: Boolean argument. Retain the full domain image as downloaded from the HSAF sftp and archive. Default is `True`. <br /> <br />
 **Real-time running**: The script is called by the script **run_hsaf_precip_convert.sh** , which is controlled by the systemd timer afnow_lmf.timer.
 
 ### Land Modification Factor
@@ -104,3 +104,19 @@ Usage: ./lmf_convert.sh [-m, --mode] [-d, --outdir] [-s, --startDir] [-e, --endd
 `[-d, --outDir]`: Explicity define a path to output the data to. If not included, defaults to the Lancaster SAN for display on the portal. Note that the files will be contained within the a subdirectory of `outDir` based on the year and month of the file. <br />
 <br /> 
 **Real-time running**: The script is called directly by the systemd timer afnow_lmf.timer.
+
+
+### LSTA conversion to GeoTIFF
+
+Convert the daily mean LSTA NetCDF file into GeoTIFF for display on the Africa Noecasting portal.
+
+Script: **lst_convert.sh** 
+
+Usage: ./lst_convert.sh [-m, --mode] [-d, --outdir] [-s, --startDir] [-e, --enddir] [-p, --reprocess]<br /><br />
+`[-m, --mode]`: Pick up most recent files (`realtime`) or process older files based upon a date range (`historical`)<br />
+`[-s, --startDate]`: Start date for historical processing (only necessary if running in historical mode ). Format is  YYYYMMDDm<br />
+`[-e, --endDate]`: Start date for historical processing (only necessary if running in historical mode ). Format is YYYYMMDD<br />
+`[-d, --outDir]`: Explicity define a path to output the data to. If not included, defaults to the Lancaster SAN for display on the portal. Note that the files will be contained within the a subdirectory of `outDir` based on the year and month of the file. <br />
+`[-p, --reprocess]`: Process the file even if the output GeoTIFF already exists. Default is `false`. <br />
+<br /> 
+**Real-time running**: The script is called directly by the systemd timer afnow_lsta.timer.
