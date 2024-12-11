@@ -25,6 +25,22 @@ from netCDF4 import Dataset
 from datetime import datetime, timedelta
 import calendar 
 
+# sort out arguments
+archiveRoot = "/mnt/prj/swift/SEVIRI_LST/lsta_ssa/nrt/"  # ./YYYYMM
+parser= argparse.ArgumentParser(description="Generate LSTA and daily mean data from raw files")
+parser.add_argument("--mode", choices=["realtime","historical"], default="realtime",help="Run mode (real time or historical)")
+# datetimes for historical
+parser.add_argument("--startDate", type=str, help="Start Date (YYYYMMDDhhmm).")
+parser.add_argument("--endDate", type=str, help="Start Date (YYYYMMDDhhmm).")
+parser.add_argument('--reprocess',type=bool,default=False,help='Reprocess file if it already exists')
+args=parser.parse_args()
+
+
+
+
+
+
+
 ancdir = "/mnt/prj/swift/SEVIRI_LST/Ancillary/"
 file_lon = ancdir+"hdf5_lsasaf_msg_lon_msg-disk_4bytesprecision"
 file_lat = ancdir+"hdf5_lsasaf_msg_lat_msg-disk_4bytesprecision"
