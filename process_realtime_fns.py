@@ -144,7 +144,7 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     mask_dir= {}
     mask_dir['sadc'] = '/mnt/prj/NC_Int_CCAd/3C/seodey/data/historical_database/Counts_2004to2019_'
     mask_dir['wa'] = '/mnt/prj/NC_Int_CCAd/3C/seodey/data/historical_database/WCA/Counts_2004to2019_'
-	
+    archiveDir= '/mnt/prj/nflics/rt_cores/'
    # datadir['sadc'] ="/prj/nflics/historical_database/date_split_SADC_v2_realtime/msg9_cell_shape_wave_rect_20041101to20191130_SADC_v2/msg9_cell_shape_wave_rect_"
    # datadir['wa'] =  "/prj/nflics/historical_database/date_split_WA_v2_realtime/msg9_cell_shape_wave_rect_20040601to20190930_WA_v2/msg9_cell_shape_wave_rect_"
      #   datadir['wa']+=["/prj/NC_Int_CCAd/3C/seodey/data/historical_database/WCA/msg9_cell_shape_wave_rect_"+dstring+"_WCA/msg9_cell_shape_wave_rect_"]	
@@ -542,9 +542,13 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     #NEED TO ADD BACK IN!
     scratchdir=os.path.join(scratchbase,str(dt_now.year),str(dt_now.month).zfill(2),\
                         str(dt_now.day).zfill(2),str(dt_now.hour).zfill(2)+str(dt_now.minute).zfill(2))
+    rt_archive=os.path.join(archiveDir,str(dt_now.year),str(dt_now.month).zfill(2),\
+                        str(dt_now.day).zfill(2),str(dt_now.hour).zfill(2)+str(dt_now.minute).zfill(2))
 
     if not os.path.exists(scratchdir): #create plot directory if it doesn't exist
         os.makedirs(scratchdir)
+    if not os.path.exists(rt_archive): #create plot directory if it doesn't exist
+        os.makedirs(rt_archive)    
 
     ds=xr.Dataset()
     ds['cores']=xr.DataArray(data_all_m[:], coords={'ys_mid': range(dimy) , 'xs_mid': range(dimx)},dims=['ys_mid', 'xs_mid']) 
@@ -555,6 +559,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     comp = dict(zlib=True, complevel=5)
     enc = {var: comp for var in ds.data_vars}
     ds.to_netcdf(path=scratchdir+"/Convective_struct_extended_"+tnow+"_000.nc",\
+                 mode='w', encoding=enc, format='NETCDF4')
+    ds.to_netcdf(path=rt_archive+"/Convective_struct_extended_"+tnow+"_000.nc",\
                  mode='w', encoding=enc, format='NETCDF4')
     # output the geotiffs for the portal
     if do_geotiff:
@@ -2740,6 +2746,7 @@ class extendedCoreCalc(multiprocessing.Process):
         #print(self.scratchdir)
         ds_ex.to_netcdf(path=self.scratchdir+"/Convective_struct_extended_"+self.tnow+"_000.nc",\
                  mode='w', encoding=enc, format='NETCDF4')
+        # archive to prj
         if self.do_geotiff:
             rasPath = self.plotdir+"/Observed_CTT_"+self.tnow+"_extended.tif"
             rasPath_3857 = self.plotdir+"/Observed_CTT_"+self.tnow+"_extended_3857.tif"
@@ -3118,3 +3125,13 @@ def generate_dates(start,end,interval):
         dateList.append(current)
         current+= delta
     return dateList
+
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')

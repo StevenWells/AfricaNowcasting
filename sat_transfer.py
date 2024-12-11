@@ -39,7 +39,15 @@ import argparse
 ##################################################
 #Set up paths (more below inside the main_code_loop and get_dat functions!)
 ##################################################
-
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 ##################################################
 #Get datype of run (historical or real-time)
 ##################################################
@@ -52,7 +60,8 @@ parser.add_argument("--startDate", type=str, help="Start Date (YYYYMMDDhhmm).")
 parser.add_argument("--endDate", type=str, help="Start Date (YYYYMMDDhhmm).")
 
 # to portal
-parser.add_argument("--toPortal", type=bool, default = True, help="Send data to portal (True) or local (False)")
+
+parser.add_argument("--toPortal", type=str2bool, default = True, help="Send data to portal (True) or local (False)")
 
 # feed (eumdat [.nc files], historical [.gra])  
 parser.add_argument("--feed", choices=["eumdat","historical"],default ='eumdat', help="Feed data source: EUMDAT(eumdat) or raw .gra (historical)")
@@ -74,7 +83,7 @@ if args.runmode =='historical':
 
 
 # default to sending to the SAN    
-toPortal = 1
+#toPortal = 1
 # default image window
 raw_tdelta = 15  # minutes of raw data interval
 
@@ -116,7 +125,8 @@ if runtype=='realtime':
     backup_mirror = '/mnt/scratch/cmt'
     #mirror_path = '/users/hymod/stewells/NFLICS/SSA/sample_live/'
 else:
-    mirror_path = '/mnt/scratch/cmt'
+    #mirror_path = '/mnt/scratch/cmt'
+    mirror_path = '/mnt/scratch/stewells/MSG_NRT/cut/'
     backup_mirror = '/mnt/scratch/stewells/MSG_NRT/cut/'
     #mirror_path = '/scratch/NFLICS/sftp_extract/current'
       #mirror_path = '/prj/nflics/real_time_data/2024/01/08/' # path to where historical NCAS raw data to process is held
@@ -246,6 +256,8 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
         plotbase="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/nflics_nowcasts/"
         daily_base="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/daily_summary_plots_test"
         scratchbase="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/nflics_current/"    #plots go here
+        lst_path="/mnt/prj/swift/SEVIRI_LST/data_anom_wrt_historic_clim_withmask"
+        rt_code_input="/mnt/prj/nflics/RT_code_v2_input/"
         #rt_save="/users/hymod/stewells/NFLICS/NFLICS_scw/real_time_data/" 
         rt_save="/mnt/prj/nflics/real_time_data/"  
     else:
