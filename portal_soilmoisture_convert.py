@@ -60,7 +60,7 @@ parser.add_argument("--endDate", type=str, help="Start Date (YYYYMMDDhhmm).")
 parser.add_argument("--outDir", type=str, default = outPath, help="Directory to send outputs to (defaults to SAN)")
 
 #domain
-parser.add_argument("--domain", choices=["WA","SSA"], default="SSA",help="Domain: West Africa (WA) or Sub-Saharan Africa (SSA)")
+parser.add_argument("--domain", choices=["WA","SSA","SSA_6k"], default="SSA",help="Domain: West Africa (WA) or Sub-Saharan Africa (SSA) or High Res SSA (SSA_6k)")
 
 # load them
 args = parser.parse_args()
@@ -68,12 +68,15 @@ args = parser.parse_args()
 # path to source
 if args.domain=='WA':
     sourcePath = '/mnt/prj/swift/ASCAT_cmt/NRT_anomalies/'
+elif args.domain == 'SSA_6k':
+    sourcePath = '/mnt/scratch/cmt/sm_6km_test/'
 else:
     sourcePath = '/mnt/prj/swift/ASCAT_SSA/NRT_anomalies/'
 
 
-domainPars = {'WA':{'nx_raw':274,'ny_raw':162,'deltax':0.25,'xll':-18.125,'yll':-15.125},
-             'SSA':{'nx_raw':293,'ny_raw':242,'deltax':0.25,'xll':-18.125,'yll':-35.125}}
+domainPars = {'WA':{'nx_raw':274,'ny_raw':162,'deltax':0.25,'xll':-18.125,'yll':-15.125,'bytes':'f'},
+             'SSA':{'nx_raw':293,'ny_raw':242,'deltax':0.25,'xll':-18.125,'yll':-35.125,'bytes':'f'},
+             'SSA_6k':{'nx_raw':730,'ny_raw':602,'deltax':0.1,'xll':-17.95,'yll':-35.0,'bytes':'h'}}
 
 # backup output folder if satdev is down
 toSdir = False
@@ -116,7 +119,11 @@ if args.mode =='historical':
     # get list of files
     all_files = []
     for x in dateList:
-        all_files+=glob.glob(os.path.join(sourcePath,x.strftime("%Y%m"),x.strftime('ASCAT_dsm_%Y%m%d_*')))
+        print([x,sourcePath])
+        if args.domain == 'SSA_6k':
+            all_files+=glob.glob(os.path.join(sourcePath,x.strftime('ASCAT_dsm_%Y%m%d_*')))
+        else:
+            all_files+=glob.glob(os.path.join(sourcePath,x.strftime("%Y%m"),x.strftime('ASCAT_dsm_%Y%m%d_*')))
 
     #all_files=glob.glob('/mnt/prj/swift/ASCAT_SSA/NRT_anomalies/202303/ASCAT_dsm_20230313*')
 else: # realtime - this has all the files that were modified since the last time the cron job was run
@@ -149,16 +156,23 @@ for root in all_files:
         #outdir = os.path.join(outPath,dateStr)
         outdir = os.path.join(args.outDir,dateStr)
     rasFile = filename.split('.')[0]+'.tif'
-    reprojFile = filename.split('.')[0]+'_'+str(newEPSG)+'.tif'
+    if args.domain == 'SSA_6k':
+        reprojFile = filename.split('.')[0]+'_6k_'+str(newEPSG)+'.tif'
+    else:
+        reprojFile = filename.split('.')[0]+'_'+str(newEPSG)+'.tif'
     print(outdir)
     if not os.path.exists(outdir):
         os.mkdir(outdir)
     #sys.exit(0)
     #GET DATA
-    gen_ints = array.array("f")
+    gen_ints = array.array(domainPars[args.domain]['bytes'])
     gen_ints.fromfile(open(root, 'rb'), os.path.getsize(root) // gen_ints.itemsize)
     data=np.array(gen_ints).reshape(ny_raw,nx_raw)
     data= data[:]
+
+    if args.domain == 'SSA_6k':
+        data = data/100.
+        data[data< -300] = -999
 
     # lowerleft is x=-18.125 y=-15.125
     # therefore ueer left is -15.125+nrows*0.15
