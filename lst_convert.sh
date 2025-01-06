@@ -22,7 +22,7 @@ mode="realtime"
 outdir="/mnt/HYDROLOGY_stewells/geotiff/lawis_lsta/"
 startDate=""
 endDate=""
-reprocess="false"
+reprocess="true"
 OPTS=$(getopt -o m:d:s:e:p:h --long mode:,outdir:,startDate:,endDate:,reprocess:,help -n "lst_convert.sh" -- "$@")
 if [[ $? -ne 0 ]]; then
   echo "Error parsing arguments" >&2
