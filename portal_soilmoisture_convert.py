@@ -88,7 +88,7 @@ origEPSG='4326'
 newEPSG='3857'
 
 # cron fequency (minutes)
-cronFreq = 60
+cronFreq = 15
 # sort the dates out
 if args.mode =='historical':
     if not args.startDate:
@@ -195,7 +195,9 @@ for root in all_files:
     rasImage.close()
     ds = gdal.Warp(reprojFile, rasFile, srcSRS='EPSG:'+str(origEPSG), dstSRS='EPSG:'+str(newEPSG), format='GTiff')
     ds = None  
-    os.system('mv '+reprojFile+' '+outdir+'/')
+    print(reprojFile)
+
+    os.system('mv '+reprojFile+' '+outdir+'/'+reprojFile)
 
     os.system('rm '+rasFile)
     #os.system('mv '+rasFile+' '+outdir)
