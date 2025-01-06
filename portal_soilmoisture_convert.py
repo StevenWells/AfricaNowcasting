@@ -88,7 +88,7 @@ origEPSG='4326'
 newEPSG='3857'
 
 # cron fequency (minutes)
-cronFreq = 15
+cronFreq = 60
 # sort the dates out
 if args.mode =='historical':
     if not args.startDate:
@@ -129,7 +129,11 @@ if args.mode =='historical':
 else: # realtime - this has all the files that were modified since the last time the cron job was run
       #if the file was editd in that time, update it (or add if new
     all_files = []
-    total_files=glob.glob(os.path.join(sourcePath,'*','ASCAT_dsm_*'))
+    if args.domain == 'SSA_6k':
+        total_files=glob.glob(os.path.join(sourcePath,'ASCAT_dsm_*'))
+    else:
+        total_files=glob.glob(os.path.join(sourcePath,'*','ASCAT_dsm_*'))
+    
     for f in total_files:
         modTimesinceEpoc = os.path.getmtime(f)
 

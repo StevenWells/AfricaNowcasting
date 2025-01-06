@@ -1,0 +1,8 @@
+[Unit]
+Description="Process hi resolution soil mositure data for Nowcasting portal"
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/run_sm6k_convert.sh
+StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_sm6k.output
+StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_sm6k.error
+Type=oneshot
