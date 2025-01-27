@@ -1,0 +1,10 @@
+[Unit]
+Description="Process unet core nowcasts and generate portal geotiffs"
+After=afnow_nflics.service
+Requires=afnow_nflics.service
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/run_cores_unet.sh
+StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_cores_unet.output
+StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_cores_unet.error
+Type=oneshot

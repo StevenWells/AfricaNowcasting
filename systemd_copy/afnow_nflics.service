@@ -6,3 +6,7 @@ ExecStart=/home/stewells/AfricaNowcasting/rt_code/run_satproc.sh
 StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_nflics.output
 StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_nflics.error
 Type=oneshot
+
+[Install]
+WantedBy=multi-user.target
+PostExecStart=/bin/systemctl --user start afnow_cores_unet.service
