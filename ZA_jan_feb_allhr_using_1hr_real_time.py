@@ -275,23 +275,31 @@ for a in range(0,len(dates_of_interest),1):
     list_of_files.append(dir_name+'IR_108_BT_'+dates_of_interest_curr[0:4]+dates_of_interest_curr[4:6]+dates_of_interest_curr[6:8]+'_'+dates_of_interest_curr[8:]+'_eumdat.nc')
 
 # check for existing t0-2 file
+
 if os.path.exists(list_of_files[0]) == False:
+    
+    list_of_files[0]=list_of_files[2]
+    list_of_files[1]=list_of_files[2] 
+    
     to2_date = dates_of_interest[0]
-   
-    dir_name = '/prj/nflics/real_time_data/'+current_year+'/'+to2_date[4:6]+'/'+to2_date[6:8]+'/' 
-    all_file_names = sorted(glob.glob(dir_name+"IR*.nc"));  #
-    latest_to2_file = all_file_names[-4*2] 
-    # check time between files 
-    to_2_date=latest_to2_file[-23:-15]+latest_to2_file[-14:-10]
-    to_2_datetime=datetime.strptime(str(int(to_2_date)), '%Y%m%d%H%M')
-    time_difference = to_date-to_2_datetime    
-    if time_difference< timedelta(hours=2.1):
-        list_of_files[0]=latest_to2_file
-        list_of_files[1]=all_file_names[-4]
-    else:
+    try:
+        dir_name = '/prj/nflics/real_time_data/'+current_year+'/'+to2_date[4:6]+'/'+to2_date[6:8]+'/' 
+        all_file_names = sorted(glob.glob(dir_name+"IR*.nc"));  #
+        latest_to2_file = all_file_names[-4*2] 
+        # check time between files 
+        to_2_date=latest_to2_file[-23:-15]+latest_to2_file[-14:-10]
+        to_2_datetime=datetime.strptime(str(int(to_2_date)), '%Y%m%d%H%M')
+        time_difference = to_date-to_2_datetime    
+        if time_difference< timedelta(hours=2.1):
+            list_of_files[0]=latest_to2_file
+            list_of_files[1]=all_file_names[-4]
+        else:
+            list_of_files[0]=list_of_files[2]
+            list_of_files[1]=list_of_files[2]  
+    except:
+        print("Unable to find suitable replacement for T0-2. Using T0 at all three time steps")
         list_of_files[0]=list_of_files[2]
         list_of_files[1]=list_of_files[2]  
-
 
 # read in tir data
 for l in range(0,len(list_of_files),1): 
