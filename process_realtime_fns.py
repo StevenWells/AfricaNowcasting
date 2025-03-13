@@ -417,8 +417,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         print("reading npz weights")
         weightdata = np.load('/home/stewells/AfricaNowcasting/rt_code/weights_data_ex.npz')
         inds = weightdata['inds_ex']
-        weights= weightdata['weights_ex']
-        new_shape=tuple(weightdata['new_shape_ex'])
+        weights= weightdata['weights']
+        new_shape=tuple(weightdata['shape'])
                            
     else: # need to make it   
         print("creating weights")
@@ -549,12 +549,18 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         os.makedirs(scratchdir)
     if not os.path.exists(rt_archive): #create plot directory if it doesn't exist
         os.makedirs(rt_archive)    
-
+    print("PMAX")
+    print(com_lat)
+    print(com_lat.shape)
+    print(com_lat[:].shape)
+    print(data_all_m[:].shape)
     ds=xr.Dataset()
     ds['cores']=xr.DataArray(data_all_m[:], coords={'ys_mid': range(dimy) , 'xs_mid': range(dimx)},dims=['ys_mid', 'xs_mid']) 
     ds.attrs['time']=tnow
     ds.attrs['grid']="NFLICS msg cutout"
     ds.attrs['missing']="nan"
+    ds["Pmax_lat"]=xr.DataArray(com_lat.values,coords={'core_ind': range(0,len(com_lat.values))}) 
+    ds["Pmax_lon"]=xr.DataArray(com_lon.values,coords={'core_ind': range(0,len(com_lon.values))}) 
     ##output
     comp = dict(zlib=True, complevel=5)
     enc = {var: comp for var in ds.data_vars}

@@ -38,6 +38,7 @@ dataDir ="/mnt/scratch/stewells/MSG_NRT/cut/"
 SANdir = '/mnt/HYDROLOGY_stewells/geotiff/ssa_nowcast_cores_unet/'
 # testdate for default historical mode date  (to duplicate date used on https://github.com/JawairiaAA/WISER_testbed_2025/ )
 testdate='202501172100'
+archiveDir= "/mnt/prj/nflics/cnn_cores/geotiff/"
 
 # get the command arguments
 parser= argparse.ArgumentParser(description="Generate geotiffs of Nowcast cores")
@@ -394,8 +395,24 @@ for leadtime in leadtimes:
     #for ix,Image in enumerate(data):
     rasImage.write(np.flipud(data_interp[:]),1)
     rasImage.close()
-
-    # reproject onto EPSG:3857 for portal usage
-    ds = gdal.Warp(rasFile, rasFile_tmp, srcSRS='EPSG:4326', dstSRS='EPSG:3857', format='GTiff',creationOptions=["COMPRESS=DEFLATE", "TILED=YES"])
-    ds = None 
+    archDir= os.path.join(archiveDir,current_date[0:8])
+    os.makedirs(archDir,exist_ok=True)
+    archFile =os.path.join(archDir,'nowcast_cores_unet_'+current_date[0:8]+'_'+current_date[8:12]+'_'+str(leadtime)+'hr_4326.tif')
+    try:
+        os.system('cp '+rasFile_tmp+' '+archFile)
+    except:
+        print("Failed to write to geotiff in 4326 archive directory")
+    try:
+        # reproject onto EPSG:3857 for portal usage
+        ds = gdal.Warp(rasFile, rasFile_tmp, srcSRS='EPSG:4326', dstSRS='EPSG:3857', format='GTiff',creationOptions=["COMPRESS=DEFLATE", "TILED=YES"])
+        ds = None 
+    except:
+        print("Failed to write to output directory")
     os.system('rm '+rasFile_tmp)
+    
+    
+    archFile =os.path.join(archDir,'nowcast_cores_unet_'+current_date[0:8]+'_'+current_date[8:12]+'_'+str(leadtime)+'hr_3857.tif')
+    try:
+        os.system('cp '+rasFile+' '+archFile)
+    except:
+        print("Failed to write to geotiff archive directory")

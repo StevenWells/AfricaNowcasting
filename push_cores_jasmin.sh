@@ -29,7 +29,7 @@ SCRATCHDIR="/mnt/scratch/NFLICS/nflics_current"
 REMOTEDIR="/gws/nopw/j04/swift/rt_cores/"
 
 eval $(ssh-agent -s)
-ssh-add ~/.ssh/id_rsa_jasmin
+ssh-add ~/.ssh/id_ecdsa_jasmin
 
 # rsync usage
 #rsync options source destination
