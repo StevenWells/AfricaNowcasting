@@ -112,7 +112,7 @@ t = 3 #numOfDays
 #regPars = {'ZA':{'coords':[-20,-5,25,55,1,1],'timeLag':2.1,'a':11,'b':-25,'modelFile':'ZA_Jan_Feb_trained_model_2005_to_2019.h5'},
 #           'KY':{'coords':[-8,7,26.5,47,100,1000],'timeLag':4.1,'a':-33,'b':19,'modelFile':'KY_MAM_trained_model_2005_to_2019.h5'}}
 
-regPars = {'ZA':{'coords':[-20,-5,25,55,1,1],'timeLag':2.1,'a':11,'b':-25,'modelFile':'ZA_DJF_trained_model_2005_to_2019.h5'},
+regPars = {'ZA':{'coords':[-20,-5,25,55,1,1],'timeLag':4.1,'a':11,'b':-25,'modelFile':'ZA_DJF_trained_model_2005_to_2019.h5'},
            'KY':{'coords':[-8,7,26.5,47,100,1000],'timeLag':4.1,'a':-33,'b':19,'modelFile':'KY_MAM_trained_model_2005_to_2019.h5'}}
 
 
@@ -416,9 +416,7 @@ for region in list(regPars.keys()):
     for leadtime in leadtimes:
 
         print("Processing "+str(leadtime)+'hr leadtime')
-        ind = np.where(cores>0)
-        cores[ind] = 1 
-        cores_t_0 = cores[:,a:,:b]
+
         if region=='ZA':  # TODO: generalise this
             tir_t_0 = tir[:,a:,:b]
         else:
