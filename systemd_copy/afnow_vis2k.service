@@ -1,0 +1,8 @@
+[Unit]
+Description="Process Visible radioation 2k data for Nowcasting portal"
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/run_vis2k.sh
+StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_vis2k.output
+StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_vis2k.error
+Type=oneshot

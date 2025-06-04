@@ -73,7 +73,9 @@ leadtimes = [1,2,4,6]
 if mode=='realtime':
     total_files=glob.glob(os.path.join(dataDir,'IR_108*'))
     new_dates = []
-    for f in total_files:
+    for f in sorted(total_files):
+            
+            """
             modTimesinceEpoc = os.path.getmtime(f)
 
             modificationTime = datetime.fromtimestamp(time.mktime(time.localtime(modTimesinceEpoc)))
@@ -82,10 +84,12 @@ if mode=='realtime':
                 # only process if not already done so (check existence of 6hr image - the last to process)
                 if not os.path.exists(os.path.join(outRoot,idate[:8],'nowcast_cores_unet_'+idate[0:8]+'_'+idate[8:12]+'_'+str(6)+'hr_3857.tif')):
                     new_dates.append(idate)    
-
+            """
+            idate =''.join(os.path.basename(f).split('_')[3:5]).split('.')[0]
+            new_dates.append(idate)    
     # Choose latest date only for now
     if len(new_dates)>0:
-        current_date = new_dates[0]
+        current_date = new_dates[-1]
     else:
         print("No data to process")
         sys.exit(0)
@@ -216,9 +220,9 @@ def FSS_loss(target_tensor, prediction_tensor):
         loss.__name__ = function_name
 
 
-def spatial_filter_conv(predicted_image):
+def spatial_filter_conv(predicted_image,half_window_size_px):
     
-    half_window_size_px=2
+    #half_window_size_px=2
     weight_matrix = _create_mean_filter(
         half_num_rows=half_window_size_px,
         half_num_columns=half_window_size_px, num_channels=1
@@ -322,7 +326,8 @@ for region in list(regPars.keys()):
         lat_sub = lat[:a,b:]
 
     # prepare resampling
-    dx = 0.026949456
+    #dx = 0.026949456
+    dx = 0.053898912
     lat_min, lat_max= np.nanmin(lat_sub),np.nanmax(lat_sub)
     lon_min, lon_max= np.nanmin(lon_sub),np.nanmax(lon_sub)
     grid_lat = np.arange(lat_min,lat_max ,dx)
@@ -463,8 +468,8 @@ for region in list(regPars.keys()):
     
         
         predicted_frames= np.round(unet_model.predict([x_pred,time_of_day_pred]),2)
-        
-        filtered_image = spatial_filter_conv(predicted_frames)
+        half_window_size_px = 7 if int(leadtime)>3 else 2
+        filtered_image = spatial_filter_conv(predicted_frames,half_window_size_px)
 
         filtered_image = np.squeeze(filtered_image[0,:,:,0])
 
@@ -505,7 +510,7 @@ for region in list(regPars.keys()):
 for lt in leadtimes:
     slt = str(lt)
     files_to_merge = regional_tifs[slt]
-    fullFile_tmp =     os.path.join('/mnt/HYDROLOGY_stewells/geotiff/ssa_nowcast_cores_unet/','nowcast_cores_unet_'+current_date[0:8]+'_'+current_date[8:12]+'_'+str(leadtime)+'hr_4326.tif')
+    fullFile_tmp =     os.path.join('/mnt/HYDROLOGY_stewells/geotiff/ssa_nowcast_cores_unet/','nowcast_cores_unet_'+current_date[0:8]+'_'+current_date[8:12]+'_'+str(lt)+'hr_4326.tif')
     rasFile =     os.path.join(outDir,'nowcast_cores_unet_'+current_date[0:8]+'_'+current_date[8:12]+'_'+str(slt)+'hr_3857.tif')
     merge_geotiffs(files_to_merge,fullFile_tmp)
     
@@ -524,8 +529,9 @@ for lt in leadtimes:
         dest.write(mosaic)
     """
     # reproject for portal
-
-
+    print("A")
+    print(fullFile_tmp)
+    print(rasFile)
     try:
         # reproject onto EPSG:3857 for portal usage
         if os.path.exists(rasFile):

@@ -1,0 +1,10 @@
+[Unit]
+Description="Run afnow_cores_unet.service every 1 minutes relative to activation time"
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Unit=afnow_cores_unet.service
+
+[Install]
+WantedBy=timers.target

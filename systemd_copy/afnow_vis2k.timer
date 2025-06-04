@@ -1,0 +1,10 @@
+[Unit]
+Description="Run afnow_vis2k.service every 1 minutes relative to activation time"
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Unit=afnow_vis2k.service
+
+[Install]
+WantedBy=timers.target
