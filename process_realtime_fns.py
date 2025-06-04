@@ -549,11 +549,7 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         os.makedirs(scratchdir)
     if not os.path.exists(rt_archive): #create plot directory if it doesn't exist
         os.makedirs(rt_archive)    
-    print("PMAX")
-    print(com_lat)
-    print(com_lat.shape)
-    print(com_lat[:].shape)
-    print(data_all_m[:].shape)
+
     ds=xr.Dataset()
     ds['cores']=xr.DataArray(data_all_m[:], coords={'ys_mid': range(dimy) , 'xs_mid': range(dimx)},dims=['ys_mid', 'xs_mid']) 
     ds.attrs['time']=tnow
