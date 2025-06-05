@@ -512,8 +512,8 @@ for region in list(regPars.keys()):
         data_interp*=100.
         # save geotiff
         # temporary file in original EPSG (to be deleted once converted to 3857 for portal)
-        #rasFile_tmp = '/mnt/HYDROLOGY_stewells/geotiff/ssa_nowcast_cores_unet/unet_'+str(leadtime)+'hr_'+region+'.tif'
-        rasFile_tmp = '../tmp/unet_'+str(leadtime)+'hr_'+region+'.tif'
+        rasFile_tmp = '/mnt/HYDROLOGY_stewells/geotiff/ssa_nowcast_cores_unet/unet_'+str(leadtime)+'hr_'+region+'.tif'
+        #rasFile_tmp = '../tmp/unet_'+str(leadtime)+'hr_'+region+'.tif'
 
         outDir = os.path.join(outRoot,current_date[0:8])
         os.makedirs(outDir,exist_ok=True)
