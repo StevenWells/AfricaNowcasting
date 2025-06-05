@@ -116,8 +116,10 @@ t = 3 #numOfDays
 #regPars = {'ZA':{'coords':[-20,-5,25,55,1,1],'timeLag':2.1,'a':11,'b':-25,'modelFile':'ZA_Jan_Feb_trained_model_2005_to_2019.h5'},
 #           'KY':{'coords':[-8,7,26.5,47,100,1000],'timeLag':4.1,'a':-33,'b':19,'modelFile':'KY_MAM_trained_model_2005_to_2019.h5'}}
 
-regPars = {'ZA':{'coords':[-20,-5,25,55,1,1],'timeLag':4.1,'a':11,'b':-25,'modelFile':'ZA_DJF_trained_model_2005_to_2019.h5'},
-           'KY':{'coords':[-8,7,26.5,47,100,1000],'timeLag':4.1,'a':-33,'b':19,'modelFile':'KY_MAM_trained_model_2005_to_2019.h5'}}
+regPars = {'ZA':{'coords':[-20,-5,25,55,1,1],'timeLag':4.1,'a':11,'b':-25,'modelFile':'ZA_DJF_trained_model_2005_to_2019.h5','regrid':False},
+           'KY':{'coords':[-8,7,26.5,47,100,1000],'timeLag':4.1,'a':-33,'b':19,'modelFile':'KY_MAM_trained_model_2005_to_2019.h5','regrid':False},
+           'SE':{'coords':[0,21,-20,1,10,1000],'timeLag':4.1,'a':-13,'b':13,'modelFile':'SE_JAS_trained_model_2005_to_2019_0p04.h5','regrid':True}}
+
 
 
 
@@ -247,10 +249,13 @@ def merge_geotiffs(tif_files,output_file):
 
     # Determine output bounds (maximum extent)
     lefts, bottoms, rights, tops = zip(*[dataset.bounds for dataset in datasets])
+
     min_left, min_bottom = min(lefts), min(bottoms)
     max_right, max_top = max(rights), max(tops)
     # Calculate output transform and dimensions
     resolution = datasets[0].res[0]  # Assuming uniform resolution
+
+ 
     width = int((max_right - min_left) / resolution)
     height = int((max_top - min_bottom) / resolution)
     transform = from_bounds(min_left, min_bottom, max_right, max_top, width, height)
@@ -262,9 +267,10 @@ def merge_geotiffs(tif_files,output_file):
     # Place each dataset in the combined data array
     for dataset in datasets:
         window = window_from_bounds(*dataset.bounds, transform=transform)
+        print(window)
         win_height = int(window.height)
         win_width = int(window.width)
-        data = dataset.read(out_shape=(dataset.count, win_height, win_width), window=window, resampling=Resampling.nearest)
+        #data = dataset.read(out_shape=(dataset.count, win_height, win_width), window=window, resampling=Resampling.nearest)
         data = dataset.read(1)
         row_off, col_off = int(window.row_off), int(window.col_off)
         
@@ -321,26 +327,37 @@ for region in list(regPars.keys()):
     if region=='ZA':
         lon_sub = lon[a:,:b]
         lat_sub = lat[a:,:b]
+    elif region=='SE':
+        lon_sub = lon[:,:]
+        lat_sub = lat[:,:]
     else:
         lon_sub = lon[:a,b:]
         lat_sub = lat[:a,b:]
 
-    # prepare resampling
+    # prepare resampling for geotiff
     #dx = 0.026949456
-    dx = 0.053898912
+    #dx = 0.053898912
+    dx = 0.04 # make same as SE processing
     lat_min, lat_max= np.nanmin(lat_sub),np.nanmax(lat_sub)
     lon_min, lon_max= np.nanmin(lon_sub),np.nanmax(lon_sub)
     grid_lat = np.arange(lat_min,lat_max ,dx)
     grid_lon = np.arange(lon_min,lon_max ,dx)
     grid_lon, grid_lat = np.meshgrid(grid_lon,grid_lat)
-
-    
     inds, weights, new_shape=uinterp.interpolation_weights(lon_sub[np.isfinite(lon_sub)], lat_sub[np.isfinite(lat_sub)],grid_lon, grid_lat, irregular_1d=True)
-    print([region,len(grid_lat),len(grid_lon),new_shape])
+    #print([region,len(grid_lat),len(grid_lon),new_shape])
 
-    cores = np.zeros((t,len(lat[:,1]),len(lon[1,:])),dtype=float) 
+    # if processing done on regular grid, set up regridding
+    if regPars[region]['regrid']:
+        regular_lat = np.arange(regPars[region]['coords'][0], regPars[region]['coords'][1], 0.04)
+        regular_lon = np.arange(regPars[region]['coords'][2], regPars[region]['coords'][3], 0.04)
+        #regular_lon, regular_lat = np.meshgrid(regular_lon,regular_lat)
+        inds_regular, weights_regular, shape_regular = uinterp.interpolation_weights(lon_sub, lat_sub, regular_lon, regular_lat) # save weights for continuous use - MSG interpolation on regular. 
+        regridded_tir = np.zeros((t,len(regular_lat),len(regular_lon)),dtype=float) 
+        #inds_totiff,weights_totiff,shape_totiff = uinterp.interpolation_weights(regular_lon,regular_lat,grid_lon, grid_lat)
+
+    #cores = np.zeros((t,len(lat[:,1]),len(lon[1,:])),dtype=float) 
     tir = np.zeros((t,len(lat[:,1]),len(lon[1,:])),dtype=float)
-
+    
 
 
     time_core = np.zeros((t)) 
@@ -408,6 +425,9 @@ for region in list(regPars.keys()):
             ds = xr.open_dataset(tir_filename).squeeze() 
             tir_temp =  ds['ir108_bt'].values  #/10000
             tir[l,:,:] = tir_temp[lat_ind[0]:lat_ind[-1]+1,lon_ind[0]:lon_ind[-1]+1]   
+            # regrid if required
+            if regPars[region]['regrid']:
+                regridded_tir[l,:,:] = uinterp.interpolate_data(tir[l,:,:], inds_regular, weights_regular, shape_regular)  # interpolation using saved weights for MSG TIR
             ds = None 
         time_core[l] = int(dates_of_interest[l])  #int(tir_filename[-15:-3])
 
@@ -422,10 +442,13 @@ for region in list(regPars.keys()):
 
         print("Processing "+str(leadtime)+'hr leadtime')
 
-        if region=='ZA':  # TODO: generalise this
-            tir_t_0 = tir[:,a:,:b]
+        if regPars[region]['regrid']:
+            tir_t_0 = regridded_tir[:,:a,b:]
         else:
-            tir_t_0 = tir[:,:a,b:]
+            if region=='ZA':  # TODO: generalise this
+                tir_t_0 = tir[:,a:,:b]
+            else:
+                tir_t_0 = tir[:,:a,b:]
 
         ind_tir = np.where(tir_t_0>-0.01)
         tir_t_0[ind_tir] = 0
@@ -473,14 +496,25 @@ for region in list(regPars.keys()):
 
         filtered_image = np.squeeze(filtered_image[0,:,:,0])
 
+
     #resample
-        data_interp=uinterp.interpolate_data(filtered_image, inds, weights, new_shape)
+        if not regPars[region]['regrid']: 
+            #print(filtered_image.shape)
+            #print(shape_totiff)
+            data_interp=uinterp.interpolate_data(filtered_image, inds, weights, new_shape)
+        
+          #  data_interp=uinterp.interpolate_data(filtered_image, inds_totiff, weights_totiff, shape_totiff)
+        else:
+            data_interp = np.copy(filtered_image) # already on fixed grid
+            
 
     # convert to probability
         data_interp*=100.
         # save geotiff
         # temporary file in original EPSG (to be deleted once converted to 3857 for portal)
-        rasFile_tmp = '/mnt/HYDROLOGY_stewells/geotiff/ssa_nowcast_cores_unet/unet_'+str(leadtime)+'hr_'+region+'.tif'
+        #rasFile_tmp = '/mnt/HYDROLOGY_stewells/geotiff/ssa_nowcast_cores_unet/unet_'+str(leadtime)+'hr_'+region+'.tif'
+        rasFile_tmp = '../tmp/unet_'+str(leadtime)+'hr_'+region+'.tif'
+
         outDir = os.path.join(outRoot,current_date[0:8])
         os.makedirs(outDir,exist_ok=True)
         

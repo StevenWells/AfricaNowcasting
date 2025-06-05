@@ -417,8 +417,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         print("reading npz weights")
         weightdata = np.load('/home/stewells/AfricaNowcasting/rt_code/weights_data_ex.npz')
         inds = weightdata['inds_ex']
-        weights= weightdata['weights']
-        new_shape=tuple(weightdata['shape'])
+        weights= weightdata['weights_ex']
+        new_shape=tuple(weightdata['new_shape_ex'])
                            
     else: # need to make it   
         print("creating weights")
