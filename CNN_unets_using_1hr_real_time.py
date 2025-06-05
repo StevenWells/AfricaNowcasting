@@ -517,8 +517,11 @@ for region in list(regPars.keys()):
 
         outDir = os.path.join(outRoot,current_date[0:8])
         os.makedirs(outDir,exist_ok=True)
-        
-        transform = rasterio.transform.from_origin(lon_min,lat_max,dx,dx)
+    
+        if not regPars[region]['regrid']: 
+            transform = rasterio.transform.from_origin(lon_min,lat_max,dx,dx)
+        else:
+            transform = rasterio.transform.from_origin(regPars[region]['coords'][2],regPars[region]['coords'][1],dx,dx)
         dat_type = str(data_interp.dtype)
         rasImage = rasterio.open(rasFile_tmp,'w',driver='GTiff',
                                 height=data_interp.shape[0],width=data_interp.shape[1],
