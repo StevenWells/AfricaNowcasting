@@ -145,6 +145,7 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     mask_dir['sadc'] = '/mnt/prj/NC_Int_CCAd/3C/seodey/data/historical_database/Counts_2004to2019_'
     mask_dir['wa'] = '/mnt/prj/NC_Int_CCAd/3C/seodey/data/historical_database/WCA/Counts_2004to2019_'
     archiveDir= '/mnt/prj/nflics/rt_cores/'
+    
    # datadir['sadc'] ="/prj/nflics/historical_database/date_split_SADC_v2_realtime/msg9_cell_shape_wave_rect_20041101to20191130_SADC_v2/msg9_cell_shape_wave_rect_"
    # datadir['wa'] =  "/prj/nflics/historical_database/date_split_WA_v2_realtime/msg9_cell_shape_wave_rect_20040601to20190930_WA_v2/msg9_cell_shape_wave_rect_"
      #   datadir['wa']+=["/prj/NC_Int_CCAd/3C/seodey/data/historical_database/WCA/msg9_cell_shape_wave_rect_"+dstring+"_WCA/msg9_cell_shape_wave_rect_"]	
@@ -588,8 +589,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 
 
 
-        make_geoTiff([data_interp],rasPath,reprojFile=rasPath_3857,extended=True,v_maj=version_maj['full'],v_min=version_min['full'],v_submin=version_submin['full'],trim=True)
-        os.system('rm '+rasPath)
+        make_geoTiff([data_interp],rasPath,reprojFile=rasPath_3857,extended=True,v_maj=version_maj['full'],v_min=version_min['full'],v_submin=version_submin['full'],trim=True,rm_distort=True)
+        #os.system('rm '+rasPath)
         # 2. visible channel
         if not np.isnan(data_all_vis).all():
             
@@ -2936,7 +2937,7 @@ def plt_nflics_ts(forigin,ts,places,locs,plotfile,csvfile,filters,nhrs=6,fixed=F
 
 
 
-def make_geoTiff(data,rasFile,doReproj = True,origEPSG='4326',newEPSG='3857',reprojFile='test.tif',extended=False,isLST=False,is_vis=False,is_nowcast=False,trim=False,v_maj=3,v_min=1,v_submin=1,subdomain=''):
+def make_geoTiff(data,rasFile,doReproj = True,origEPSG='4326',newEPSG='3857',reprojFile='test.tif',extended=False,isLST=False,is_vis=False,is_nowcast=False,trim=False,v_maj=3,v_min=1,v_submin=1,subdomain='',rm_distort=False):
 
 #   extended = FULL domain over all SSA
 #   domain = ''  but set to wa or sa for sub domains. 
@@ -2945,6 +2946,7 @@ def make_geoTiff(data,rasFile,doReproj = True,origEPSG='4326',newEPSG='3857',rep
 #   nowcasts, LSTA over subdomain
     versionstr = str(v_maj)+'.'+str(v_min)+'.'+str(v_submin)
     nbands = len(data)
+    distortMask = '/home/stewells/AfricaNowcasting/ancils/shapefiles/ctt_cutout.shp'
     # SET TRANSFORM
     if extended: # over the full domain 
         dat_type = str(data[0].dtype)
@@ -2974,6 +2976,8 @@ def make_geoTiff(data,rasFile,doReproj = True,origEPSG='4326',newEPSG='3857',rep
             transform = rasterio.transform.from_origin(-20.1836,19.908,0.029,0.029)
             dat_type = 'float32'
             #transform = rasterio.transform.from_bounds(-21.6588,19.908,0.029,0.02)
+
+
     rasImage = rasterio.open(rasFile,'w',driver='GTiff',
                            height=data[0].shape[0],width=data[0].shape[1],
                            count=nbands,dtype=dat_type,
@@ -2984,11 +2988,14 @@ def make_geoTiff(data,rasFile,doReproj = True,origEPSG='4326',newEPSG='3857',rep
     rasImage.close()
     # add metadata version
     gdaledit= '/users/hymod/stewells/miniconda2/envs/py37/bin/gdal_edit.py'
+    gdalwarp= '/users/hymod/stewells/.conda/envs/py37/bin/gdalwarp'
     #cmd = ['gdal_edit.py',rasFile,'-mo',"VERSION=Version 1.0"]
     #print(versionstr)
     os.system("gdal_edit.py -mo \"xmp_Version_Version="+versionstr+"\" "+rasFile)
     #subprocess.call(cmd,shell=True)
 	
+
+
     if trim: # only required for extended
 #crop parameters       
         upper_left_x = -20
@@ -3009,6 +3016,13 @@ def make_geoTiff(data,rasFile,doReproj = True,origEPSG='4326',newEPSG='3857',rep
     if doReproj:
         ds = gdal.Warp(reprojFile, rasFile2, srcSRS='EPSG:'+str(origEPSG), dstSRS='EPSG:'+str(newEPSG), format='GTiff',creationOptions=["COMPRESS=LZW"])
         ds = None  
+
+    if rm_distort:
+        print("distortions removed")
+        rasFile_distort = reprojFile[:-4]+'_distort.tif'
+        os.system('gdalwarp -cutline '+distortMask+' -crop_to_cutline -dstnodata -999 '+reprojFile+' '+rasFile_distort)
+        os.system('mv '+rasFile_distort+' '+reprojFile)
+#gdalwarp -cutline ctt_cutout.shp -crop_to_cutline -dstnodata 0 Observed_CTT_202502100630_extended_3857.tif outtest3.tif
     
 
 

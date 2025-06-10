@@ -128,9 +128,9 @@ else:
     #mirror_path = '/mnt/scratch/cmt'
     mirror_path = '/mnt/scratch/stewells/MSG_NRT/cut/'
     backup_mirror = '/mnt/scratch/stewells/MSG_NRT/cut/'
-    #mirror_path = '/scratch/NFLICS/sftp_extract/current'
+    #mirror_path = '/scratch/NFLICS/sftp_extract/current/'
       #mirror_path = '/prj/nflics/real_time_data/2024/01/08/' # path to where historical NCAS raw data to process is held
-
+    #mirror_path = '/mnt/prj/nflics/real_time_data/'
 
 
 
@@ -469,10 +469,12 @@ if runtype=='realtime':
     a2=signal.alarm(alarm_length_code)
 else:
     new_files = []
+
     if fStruct=='direct':
         new_files = [os.path.join(mirror_path,datetime.datetime.strftime(x,'IR_108_BT_%Y%m%d_%H%M.nc')) for x in dateList]
     elif fStruct=='YMD':
-        new_files= [os.path.join(mirror_path,str(x.year),str(x.month).zfill(2),str(x.day).zfill(2),datetime.datetime.strftime(x,'IR_108_BT_%Y%m%d_%H%M.nc')) for x in dateList]
+        print([os.path.join(mirror_path,str(x.year),str(x.month).zfill(2),str(x.day).zfill(2),datetime.datetime.strftime(x,'IR_108_BT_%Y%m%d_%H%M_eumdat.nc')) for x in dateList])
+        new_files= [os.path.join(mirror_path,str(x.year),str(x.month).zfill(2),str(x.day).zfill(2),datetime.datetime.strftime(x,'IR_108_BT_%Y%m%d_%H%M_eumdat.nc')) for x in dateList]
     elif fStruct=='YM':
         new_files= [os.path.join(mirror_path,str(x.year),str(x.month).zfill(2),datetime.datetime.strftime(x,'IR_108_BT_%Y%m%d_%H%M.nc')) for x in dateList]
  
