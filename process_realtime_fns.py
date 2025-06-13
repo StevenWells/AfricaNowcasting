@@ -1326,7 +1326,7 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
            #      ##output
                 comp = dict(zlib=True, complevel=5)
                 enc = {var: comp for var in ds_nc.data_vars}
-                ds_nc.to_netcdf(path=plotdir+"/Nowcast_"+tnow+"_000.nc",mode='w', encoding=enc, format='NETCDF4')
+                ds_nc.to_netcdf(path=plotdir+"/Nowcast_"+tnow+"_000"+dom_suffix[domain]+".nc",mode='w', encoding=enc, format='NETCDF4')
 			
 
                 if do_geotiff and do_point_timeseries and len(pt_locn_names[domain])>0:
