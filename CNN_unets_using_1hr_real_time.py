@@ -249,7 +249,7 @@ def merge_geotiffs(tif_files,output_file):
 
     # Determine output bounds (maximum extent)
     lefts, bottoms, rights, tops = zip(*[dataset.bounds for dataset in datasets])
-
+    #print([lefts, bottoms, rights, tops])
     min_left, min_bottom = min(lefts), min(bottoms)
     max_right, max_top = max(rights), max(tops)
     # Calculate output transform and dimensions
@@ -267,7 +267,6 @@ def merge_geotiffs(tif_files,output_file):
     # Place each dataset in the combined data array
     for dataset in datasets:
         window = window_from_bounds(*dataset.bounds, transform=transform)
-        print(window)
         win_height = int(window.height)
         win_width = int(window.width)
         #data = dataset.read(out_shape=(dataset.count, win_height, win_width), window=window, resampling=Resampling.nearest)
@@ -276,7 +275,7 @@ def merge_geotiffs(tif_files,output_file):
         
         # Identify valid data points and place them in the combined array
         valid_mask = ~np.isnan(data)
-
+        
         combined_data[row_off:row_off + win_height+1, col_off:col_off + win_width+1] = np.where(
             valid_mask, 
             data, 
@@ -338,12 +337,13 @@ for region in list(regPars.keys()):
     #dx = 0.026949456
     #dx = 0.053898912
     dx = 0.04 # make same as SE processing
+    # these are from MSG
     lat_min, lat_max= np.nanmin(lat_sub),np.nanmax(lat_sub)
     lon_min, lon_max= np.nanmin(lon_sub),np.nanmax(lon_sub)
     grid_lat = np.arange(lat_min,lat_max ,dx)
     grid_lon = np.arange(lon_min,lon_max ,dx)
-    grid_lon, grid_lat = np.meshgrid(grid_lon,grid_lat)
-    inds, weights, new_shape=uinterp.interpolation_weights(lon_sub[np.isfinite(lon_sub)], lat_sub[np.isfinite(lat_sub)],grid_lon, grid_lat, irregular_1d=True)
+    grid_lon_mesh, grid_lat_mesh = np.meshgrid(grid_lon,grid_lat)
+    inds, weights, new_shape=uinterp.interpolation_weights(lon_sub[np.isfinite(lon_sub)], lat_sub[np.isfinite(lat_sub)],grid_lon_mesh, grid_lat_mesh, irregular_1d=True)
     #print([region,len(grid_lat),len(grid_lon),new_shape])
 
     # if processing done on regular grid, set up regridding
@@ -353,6 +353,7 @@ for region in list(regPars.keys()):
         #regular_lon, regular_lat = np.meshgrid(regular_lon,regular_lat)
         inds_regular, weights_regular, shape_regular = uinterp.interpolation_weights(lon_sub, lat_sub, regular_lon, regular_lat) # save weights for continuous use - MSG interpolation on regular. 
         regridded_tir = np.zeros((t,len(regular_lat),len(regular_lon)),dtype=float) 
+        print(regridded_tir.shape)
         #inds_totiff,weights_totiff,shape_totiff = uinterp.interpolation_weights(regular_lon,regular_lat,grid_lon, grid_lat)
 
     #cores = np.zeros((t,len(lat[:,1]),len(lon[1,:])),dtype=float) 
@@ -400,7 +401,7 @@ for region in list(regPars.keys()):
         
         to2_date = dates_of_interest[0]
         try:
-            dir_name = '/prj/nflics/real_time_data/'+current_year+'/'+to2_date[4:6]+'/'+to2_date[6:8]+'/' 
+            dir_name = '/mnt/prj/nflics/real_time_data/'+current_year+'/'+to2_date[4:6]+'/'+to2_date[6:8]+'/' 
             all_file_names = sorted(glob.glob(dir_name+"IR*.nc"));  #
             latest_to2_file = all_file_names[-4*2] 
             # check time between files 
@@ -440,7 +441,7 @@ for region in list(regPars.keys()):
     # loop over lead times here
     for leadtime in leadtimes:
 
-        print("Processing "+str(leadtime)+'hr leadtime')
+        print("Processing "+str(leadtime)+'hr leadtime for '+str(region))
 
         if regPars[region]['regrid']:
             tir_t_0 = regridded_tir[:,:a,b:]
@@ -475,6 +476,7 @@ for region in list(regPars.keys()):
         # Define input shape
         image_height= len(tir_t_0[1,:,1]) #lat
         image_width= len(tir_t_0[1,1,:]) #lon
+       
 
         num_channels= 3 #  core at t0-, core at t0-1,  
         x_pred= np.zeros((1,image_height,image_width, num_channels))
@@ -517,11 +519,18 @@ for region in list(regPars.keys()):
 
         outDir = os.path.join(outRoot,current_date[0:8])
         os.makedirs(outDir,exist_ok=True)
-    
+
+        #print(lon_min,lat_max)
+        #print(regPars[region]['coords'][2],regPars[region]['coords'][1])
+        #print(len(regular_lon[b:]), len(regular_lat[:a]))
+        #print(regular_lon[b],regular_lat[a])
         if not regPars[region]['regrid']: 
+            
             transform = rasterio.transform.from_origin(lon_min,lat_max,dx,dx)
         else:
-            transform = rasterio.transform.from_origin(regPars[region]['coords'][2],regPars[region]['coords'][1],dx,dx)
+            #transform = rasterio.transform.from_origin(regPars[region]['coords'][2],regPars[region]['coords'][1],dx,dx)
+            transform = rasterio.transform.from_origin(regular_lon[b],regular_lat[a+1],dx,dx)
+
         dat_type = str(data_interp.dtype)
         rasImage = rasterio.open(rasFile_tmp,'w',driver='GTiff',
                                 height=data_interp.shape[0],width=data_interp.shape[1],
