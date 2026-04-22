@@ -1,4 +1,5 @@
 #!/bin/bash
+# CLEAN HSAF ARCHIVE
 date
 source /etc/profile.d/conda.sh
 conda activate py37
