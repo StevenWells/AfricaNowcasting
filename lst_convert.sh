@@ -19,7 +19,8 @@ indir="/mnt/prj/swift/SEVIRI_LST/lsta_ssa/nrt/"
 
 # default argument values
 mode="realtime"
-outdir="/mnt/HYDROLOGY_stewells/geotiff/lawis_lsta/"
+#outdir="/mnt/HYDROLOGY_stewells/geotiff/lawis_lsta/"
+outdir="/mnt/HYDROLOGY_stewells/geotiff/ssa_lsta_mtg/"
 #outdir="/home/stewells/AfricaNowcasting/tmp/"
 startDate=""
 endDate=""
@@ -208,6 +209,7 @@ for FFILE in "${FILES[@]}"
           #ls $wdir
           cp -f $newfile_ready $newfile
 
+          
           #############rm -f $newfile_ready
           #############rm -f $newfile_pre
           # rm tmp*.vrt
