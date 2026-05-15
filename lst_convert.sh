@@ -10,8 +10,9 @@ cd /home/stewells/AfricaNowcasting/rt_code
 export GDAL_NETCDF_BOTTOMUP=NO
 #nodata_value=9.969209999999999e+36
 nodata_value=9.96920996838687e+36 
-file_prefix="LSASAF_lst_anom_Daymean_withmask_withHistClim_"
-file_suffix="_1700.nc"
+#file_prefix="LSASAF_lst_anom_Daymean_withmask_withHistClim_"
+file_prefix="LSASAF_lst_anom_Daymean_MTG_"
+file_suffix="_3857.nc"
 #nodata_value=9969209968386869046778552952102584320.0
 large_value=9.00000e+10
 # argument to script = full path to NETCDF file
@@ -139,12 +140,13 @@ for FFILE in "${FILES[@]}"
      curr_day=${curr_date:: 8}
      #root="/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data/"
 
+     
     # root="/mnt/HYDROLOGY_stewells/geotiff/lawis_lsta/"
      root=$outdir
      wdir="/home/stewells/AfricaNowcasting/tmp/"
 
      # final file on the SAN
-     newfile=$root$curr_day'/LSASAF_lst_anom_Daymean_withmask_withHistClim_'$curr_date'_mask.tif'
+     newfile=$root$curr_day'/LSASAF_lst_anom_Daymean_MTG_'$curr_day'_3857.tif'
      if [ ! -f "$newfile" ] || [ "$reprocess" = "true" ]; then
 
           mkdir -p $root$curr_day
