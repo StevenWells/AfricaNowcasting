@@ -1,0 +1,10 @@
+[Unit]
+Description="Run afnow_ecmwfwind.service every half hour relative to activation time"
+
+[Timer]
+OnBootSec=60min
+OnUnitActiveSec=60min
+Unit=afnow_ecmwfwind.service
+
+[Install]
+WantedBy=timers.target

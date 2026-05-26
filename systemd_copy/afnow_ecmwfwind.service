@@ -1,0 +1,9 @@
+[Unit]
+Description="Process ECMWF wind and TCWV for Nowcasting portal"
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/run_ecmwfwind.sh
+StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_ecmwfwind.output
+StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_ecmwfwind.error
+Type=oneshot
+TimeoutStartSec=5min
