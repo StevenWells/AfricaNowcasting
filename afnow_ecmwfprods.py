@@ -3,7 +3,7 @@ import xarray as xr
 from ecmwf.opendata import Client
 import multiprocessing as mp
 import pandas as pd
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import numpy as np
 import rasterio, sys
 from rasterio.transform import from_origin
