@@ -1,0 +1,8 @@
+[Unit]
+Description="Generate NetNCC nowcasts and  portal geotiffs"
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/run_netncc_nowcasts.sh
+StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_netncc_nowcasts.output
+StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_netncc_nowcasts.error
+Type=oneshot
