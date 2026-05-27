@@ -3016,7 +3016,8 @@ def make_geoTiff(data,rasFile,doReproj = True,origEPSG='4326',newEPSG='3857',rep
     if doReproj:
         ds = gdal.Warp(reprojFile, rasFile2, srcSRS='EPSG:'+str(origEPSG), dstSRS='EPSG:'+str(newEPSG), format='GTiff',creationOptions=["COMPRESS=LZW"])
         ds = None  
-
+    else:
+        reprojFile = rasFile2
 
     if rm_distort:
         print("distortions removed")
