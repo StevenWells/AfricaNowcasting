@@ -1,0 +1,8 @@
+[Unit]
+Description="Process LSTA data for Nowcasting portal"
+
+[Service]
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/run_lsta_mtg.sh
+StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_lsta_mtg.output
+StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_lsta_mtg.error
+Type=oneshot
