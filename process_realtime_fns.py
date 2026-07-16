@@ -38,15 +38,14 @@ import netCDF4 as nc
 sys.path.append('/mnt/users/hymod/seodey/NFLICS/')
 import ccores.cores as cores
 
-#code_dir="/home/stewells/AfricaNowcasting/rt_code/"
-code_dir="/mnt/users/hymod/seodey/NFLICS/AfricaNowcasting/"
+
 ##################################################
 # Main function to create the nowcasts
 ###############################################
 def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_base,rt_code_input,archiveDir,lawisDirs,options):
     processClock= time.time()
     
-	
+    code_dir=options["code_dir"]
     do_full_nowcast = ['wa','sadc']  #NFLICS nowcasts are for two domains
     
     #Flood Risk. WILL BE REMOVED SRA-------------------------

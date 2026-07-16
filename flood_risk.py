@@ -340,7 +340,8 @@ def plot_slice_risk(ds_dakar,ds_grid_info,grid_poly_ds,vectoplt,outfile,plot_typ
         plt.show()
         plt.close()
 
-
+"""
+#Testing options for stand-alone run
 tnow="202509090800"   #hard code for testing. Will be arguments
 lawisDirs={"viaSDir":'/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data',
                "mntDir":'/mnt/HYDROLOGY_stewells/',
@@ -361,7 +362,7 @@ options={"do_extended_core_calcs":False,
 }
 
 #run_flood_risk(tnow,lawisDirs,options)
-    
+ """   
 def run_flood_risk(tnow,lawisDirs,options):
     dt_now=datetime.datetime.strptime(tnow,"%Y%m%d%H%M")    # get the required dates
     #fixed file paths

@@ -37,7 +37,11 @@
    #        SRA added dictionary "options" to contain all choice variables at the top level. This is an argument    
    #            to process_realtime_fns and contains all option choices (arguments and fixed)
    #        SRA added dictionary "lawisDirs" contain the lawis directory information at the top level
-   
+#16/07/2026 SRA edited to include seperate flood risk code (flood_risk.py) taking flood risk out of main loop  
+#           SRA proess_realtime_fns.py extracts commune point NFLICS probabilites to file
+#               flood_risk.py then reads them in.  
+#           SRA changes to set only one user specific "user" variabe to swap between
+#               offline directories
 import os,glob,shutil,sys, re
 
 import netCDF4 as nc  
@@ -125,6 +129,8 @@ if runtype=='historical':
 print("Running in "+runtype+" mode")
 print("Sending outputs to Africa Nowcast portal: "+str(args.toPortal))
 print("Processing using feed: "+args.feed)
+
+user="stewells"
 
 if runtype=='realtime':
    # mirror_path = '/scratch/NFLICS/sftp_extract/current'   # path to NCAS mirror 
@@ -262,9 +268,15 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
     #datadir ="/prj/NC_Int_CCAd/3C/seodey/data/historical_database/msg9_cell_shape_wave_rect_2004001to20190930_WA_v2
 	###datadir="/prj/nflics/historical_database/msg9_cell_shape_wave_rect_20040601to20190930_realtime/msg9_cell_shape_wave_rect_" #historical database
     
-    lawisDirs={"viaSDir":'/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data',
+    if user=="seodey":
+        lawisDirs={"viaSDir":'/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data',
                "mntDir":'/mnt/HYDROLOGY_stewells/',
                "offlineDir":'/mnt/users/hymod/seodey/NFLICS/nflics_current/'}
+    else:
+        lawisDirs={"viaSDir":'/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data',
+               "mntDir":'/mnt/HYDROLOGY_stewells/',
+               "offlineDir":'/mnt/HYDROLOGY_stewells/'}
+
     options={"do_extended_core_calcs":False,
             "do_lst_adjustments" :False,
             "do_shared_plots":True,
@@ -279,11 +291,21 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
              "nflics_output_version_portal": 2,
              "run_risk":True             #
 }   
+    if user=="seodey":
+        options["code_dir"]="/mnt/users/hymod/seodey/NFLICS/AfricaNowcasting/"
+    else:
+        options["code_dir"]="/home/stewells/AfricaNowcasting/rt_code/"
             
     if run_offline:
-        plotbase="/mnt/users/hymod/seodey/NFLICS/nflics_nowcasts/"
-        daily_base="/mnt/users/hymod/seodey/NFLICS/daily_summary_plots"
-        scratchbase="/mnt/users/hymod/seodey/NFLICS/nflics_current/"    #plots go here
+        if user=="seodey":
+            plotbase="/mnt/users/hymod/seodey/NFLICS/nflics_nowcasts/"
+            daily_base="/mnt/users/hymod/seodey/NFLICS/daily_summary_plots"
+            scratchbase="/mnt/users/hymod/seodey/NFLICS/nflics_current/"    #plots go here
+        else:
+            plotbase="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/nflics_nowcasts/"
+            daily_base="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/daily_summary_plots_test"
+            scratchbase="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/nflics_current/"    #plots go here
+        
         lst_path="/mnt/prj/swift/SEVIRI_LST/data_anom_wrt_historic_clim_withmask"
         rt_code_input="/mnt/prj/nflics/RT_code_v2_input/"
         #rt_save="/users/hymod/stewells/NFLICS/NFLICS_scw/real_time_data/" 
@@ -321,10 +343,14 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
 	
     #settings only used when shadow_run==True
     if run_offline:
-        save_plotbase="/mnt/users/hymod/seodey/NFLICS/nflics_nowcasts_test/"      #plots go here
-        save_scratchbase="/mnt/scratch/seodey/nflics_current/"  #plots go here
-		
-        save_rt_save="/mnt/users/hymod/seodey/NFLICS/real_time_data/"        #archive of real time data from ncas
+        if user=="seodey":
+            save_plotbase="/mnt/users/hymod/seodey/NFLICS/nflics_nowcasts_test/"      #plots go here
+            save_scratchbase="/mnt/scratch/seodey/nflics_current/"  #plots go here
+            save_rt_save="/mnt/users/hymod/seodey/NFLICS/real_time_data/"        #archive of real time data from ncas
+        else:
+            save_plotbase="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/nflics_nowcasts_test/"      #plots go here
+            save_scratchbase="/mnt/scratch/stewells/nflics_current/"  #plots go here
+            save_rt_save="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/real_time_data/"        #archive of real time data from ncas
     else:
         save_plotbase="/mnt/prj/nflics/nflics_nowcasts/"      #plots go here
         save_scratchbase="/mnt/scratch/NFLICS/nflics_current/"
