@@ -30,7 +30,9 @@
 # 11/04/2024 SCW Update historical database extraction to be a linear combination of three months (last month, this month and next month). Include masking of probabilities
 # 31/05/2025 SCW Bugfix on mask file selection. Updating geotiff outputs to be direct to Lancaster
 #SRA run example
-#python sat_transfer.py historical --startDate 202509090800 --endDate 202509090800 --toPortal 0 --feed eumdat --fStruct YMD
+#python sat_transfer.py historical --startDate 202509091000 --endDate 202509091000 --toPortal 0 --feed eumdat --fStruct YMD
+#python sat_transfer.py historical --startDate 202508150000 --endDate 202508150000 --toPortal 0 --feed eumdat --fStruct YMD
+
 #21/04/2026 SRA removed db_version argument to process_realtime_v3 as not used
    #        SRA added dictionary "options" to contain all choice variables at the top level. This is an argument    
    #            to process_realtime_fns and contains all option choices (arguments and fixed)
@@ -40,6 +42,7 @@ import os,glob,shutil,sys, re
 
 import netCDF4 as nc  
 import process_realtime_fns as fns   #will need to move this code into sftp_extract directory
+import flood_risk as risk
 import time
 import datetime
 import argparse
@@ -271,8 +274,11 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
             # OPTIMISATION OPTIONS
             "opt_geotiff" : True,
             "opt_geotiff_float32":True,
-            "opt_geotiff_ndpls" : 2
-            }   
+            "opt_geotiff_ndpls" : 2,
+            "extract_riskpt": True,
+             "nflics_output_version_portal": 2,
+             "run_risk":True             #
+}   
             
     if run_offline:
         plotbase="/mnt/users/hymod/seodey/NFLICS/nflics_nowcasts/"
@@ -347,7 +353,6 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
             use_time=use_file[19:23]
             
         tnow=use_year+use_month+use_day+use_time
-        print("SRA  tnow:",tnow)
         ###############################################
         #1. copy the rt data to somewhere safe
         #print("Move observed image to database")
@@ -365,10 +370,8 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
         print(os.path.join(savedir,sfile))
         print(os.path.exists(os.path.join(savedir,sfile)))
         if not os.path.exists(os.path.join(savedir,sfile)):
-            print("SRA T1")
             shutil.copy2(sourcePath,os.path.join(savedir,sfile))
         else:
-            print("SRA T2")
             if overwrite:
                 print("Overwriting previously processed file")
             else:
@@ -422,10 +425,16 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
         ###############################################
         #3. calculate nowcasts
 		
-        print("SRA test upto nowcasts")
-
         fns.process_realtime_v3(tnow,datadir,os.path.dirname(sourcePath),plotdir,scratchbase,lst_path,nflics_base,rt_code_input,archiveDir,lawisDirs,options)
-                    
+        
+        ###############################################
+        #3B . RUN FLOOD RISK
+        if options["run_risk"]:
+            print("running Dakar flood risk")
+            risk.run_flood_risk(tnow,lawisDirs,options)
+        else:    
+            pass
+        
         if options["ukceh_mirror"]==True:
             remotedir=os.path.join(remote_path,"nflics_nowcasts",use_year,use_month,use_day,use_time)
             remotedir_daily_summary=os.path.join(remote_path,"daily_summary_plots")
