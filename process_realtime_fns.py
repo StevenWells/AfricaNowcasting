@@ -561,6 +561,7 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     ##output
     comp = dict(zlib=True, complevel=5)
     enc = {var: comp for var in ds.data_vars}
+    print("writing to netcdf")
     ds.to_netcdf(path=scratchdir+"/Convective_struct_extended_"+tnow+"_000.nc",\
                  mode='w', encoding=enc, format='NETCDF4')
     ds.to_netcdf(path=rt_archive+"/Convective_struct_extended_"+tnow+"_000.nc",\

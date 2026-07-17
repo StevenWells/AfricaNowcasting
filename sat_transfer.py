@@ -507,7 +507,7 @@ else:
 for new_file in new_files:
     if runtype=='realtime':
 
-        main_code_loop(new_file,mirror_path,shadow_run,db_version,run_offline,backup_mirror)
+        main_code_loop(new_file,mirror_path,shadow_run,db_version,run_offline,backup_mirror,overwrite=True)
         a2=signal.alarm(a2)
         #except Exception as e:
         #    print(e)
