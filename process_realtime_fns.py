@@ -180,7 +180,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         # also combine the site names
         #pt_locn_names_full+=pt_locn_names[dom]
         #pt_locn_locs_full+=pt_locn_locs[dom]
-        pt_locns_full=pt_locns_full|pt_locns[dom]
+        #pt_locns_full=pt_locns_full|pt_locns[dom]
+        pt_locns_full.update(pt_locns[dom])
         
     geotiff_outpath = get_portal_outpath('CTT',tnow,lawisDirs,viaS = True)
     #geotiff_outpath = '/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data'
@@ -274,7 +275,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         data_all=data_all[grid_lims_rt[0]:grid_lims_rt[2],grid_lims_rt[1]:grid_lims_rt[3]][:-1,]
 
     elif options["feed"]=="eumdat":
-        rt_file=rt_dir+"/IR_108_BT_"+tnow[:8]+"_"+tnow[-4:]+"_eumdat.nc" ##sra 2026
+        rt_ext = '' if options["runtype"]=='realtime' else '_eumdat'
+        rt_file=rt_dir+"/IR_108_BT_"+tnow[:8]+"_"+tnow[-4:]+rt_ext+".nc" ##sra 2026
         rt_lats,rt_lons,data_all=get_rt_data(rt_file,ftype='ir108_bt',haslatlon=False)
 
         if do_extended_core_calcs:
@@ -382,25 +384,25 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     if os.path.exists(code_dir+'weights_data_ex.npz'):  
         print("reading npz weights")
         weightdata = np.load(code_dir+'weights_data_ex.npz')
-        inds = weightdata['inds'] 
-        weights= weightdata['weights'] #SRA removed _ex to match file creation above
-        new_shape=tuple(weightdata['new_shape'])                           
+        inds = weightdata['inds_ex'] 
+        weights= weightdata['weights_ex'] #SRA removed _ex to match file creation above
+        new_shape=tuple(weightdata['new_shape_ex'])                           
     else: # need to make it   
         print("creating weights")
         inds, weights, new_shape=uinterp.interpolation_weights(lons_mid[np.isfinite(lons_mid)], lats_mid[np.isfinite(lats_mid)],blobs_lons, blobs_lats, irregular_1d=True)
-        np.savez(code_dir+'weights_data_ex.npz',inds=inds,weights=weights,new_shape=np.array(new_shape))
+        np.savez(code_dir+'weights_data_ex.npz',inds_ex=inds,weights_ex=weights,new_shape_ex=np.array(new_shape))
 
 # weights for the full domain: return journey...
     if os.path.exists(code_dir+'weights_2_data_ex_a.npz'):
         print("reading npz weights 2")
         weight2data = np.load(code_dir+'weights_2_data_ex_a.npz')
         inds_2 = weight2data['inds_2_ex']
-        weights_2= weight2data['weights_2']
-        new_shape_2=tuple(weight2data['new_shape_2'])                          
+        weights_2= weight2data['weights_2_ex']
+        new_shape_2=tuple(weight2data['new_shape_2_ex'])                          
     else: # need to make it   
         print("creating weights 2")
         inds_2, weights_2, new_shape_2=uinterp.interpolation_weights(blobs_lons[np.isfinite(blobs_lons)], blobs_lats[np.isfinite(blobs_lats)], lons_mid, lats_mid)
-        np.savez(code_dir+'weights_2_data_ex_a.npz',inds_2_ex=inds_2,weights_2=weights_2,new_shape_2=np.array(new_shape_2))
+        np.savez(code_dir+'weights_2_data_ex_a.npz',inds_2_ex=inds_2,weights_2_ex=weights_2,new_shape_2_ex=np.array(new_shape_2))
 			
 # weights for the full domain vis data: native -> constant res 3km for geotiff conversion	
     if os.path.exists(code_dir+'weights_ssa_3km.npz'):  #full grid 

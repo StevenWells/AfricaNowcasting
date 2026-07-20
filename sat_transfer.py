@@ -283,6 +283,7 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
             "do_point_timeseries" : True,
             "do_geotiff" : True, #Needs to be true to output the timeseris
             "output_site_cores":True,
+            "runtype":runtype,
             # OPTIMISATION OPTIONS
             "opt_geotiff" : True,
             "opt_geotiff_float32":True,
@@ -457,7 +458,7 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
         #3B . RUN FLOOD RISK
         if options["run_risk"]:
             print("running Dakar flood risk")
-            risk.run_flood_risk(tnow,lawisDirs,options)
+            risk.run_flood_risk(tnow,lawisDirs,options,plotbase)
         else:    
             pass
         

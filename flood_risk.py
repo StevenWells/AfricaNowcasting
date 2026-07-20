@@ -361,13 +361,13 @@ options={"do_extended_core_calcs":False,
              "nflics_output_version_portal": 2 #
 }
 
-#run_flood_risk(tnow,lawisDirs,options)
+#run_flood_risk(tnow,lawisDirs,options,plotbase)
  """   
-def run_flood_risk(tnow,lawisDirs,options):
+def run_flood_risk(tnow,lawisDirs,options,plotbase):
     dt_now=datetime.datetime.strptime(tnow,"%Y%m%d%H%M")    # get the required dates
     #fixed file paths
     rt_code_input="/mnt/prj/nflics/RT_code_v2_input/"
-    plotbase="/mnt/users/hymod/seodey/NFLICS/nflics_nowcasts/"
+    #plotbase="/mnt/users/hymod/stewells/NFLICS/nflics_nowcasts/"
     plotdir=os.path.join(plotbase,tnow[:4],tnow[4:6],tnow[6:8],tnow[8:12])
     #read in preseent input information
     hazard_mapping=pd.read_csv(rt_code_input+"/Hazard_mapping.csv").to_dict(orient="list")
@@ -391,7 +391,7 @@ def run_flood_risk(tnow,lawisDirs,options):
         daily_dir=os.path.join("/",*plotdir.split("/")[:-3],str(yesterday.month).zfill(2),str(yesterday.day).zfill(2))
     else:
         daily_dir=os.path.join("/",*plotdir.split("/")[:-1])
-        
+    os.makedirs(daily_dir,exist_ok=True)
     daily_file=os.path.join(daily_dir,"Day_cores_"+"".join(daily_dir.split("/")[-3:])+".csv")
     daily_cores=pd.read_csv(daily_file)             #read in daily cores file
     #format
