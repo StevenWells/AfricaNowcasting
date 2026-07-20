@@ -17,7 +17,7 @@ system = 'satdev'
 dx_3km=0.026949456
 
 # remake even if no new data
-remake = True
+remake = False
 mode = 'realtime'  #or 'historical'
 # directories
 SCRATCHSAVE='/mnt/scratch/stewells/MTG_LST/full_disc'
