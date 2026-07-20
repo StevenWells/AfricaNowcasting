@@ -29,10 +29,24 @@
 # 11/05/2023 SCW Allow main input domain to be whole of West Africa
 # 11/04/2024 SCW Update historical database extraction to be a linear combination of three months (last month, this month and next month). Include masking of probabilities
 # 31/05/2025 SCW Bugfix on mask file selection. Updating geotiff outputs to be direct to Lancaster
+#SRA run example
+#python sat_transfer.py historical --startDate 202509091000 --endDate 202509091000 --toPortal 0 --feed eumdat --fStruct YMD
+#python sat_transfer.py historical --startDate 202508150000 --endDate 202508150000 --toPortal 0 --feed eumdat --fStruct YMD
+
+#21/04/2026 SRA removed db_version argument to process_realtime_v3 as not used
+   #        SRA added dictionary "options" to contain all choice variables at the top level. This is an argument    
+   #            to process_realtime_fns and contains all option choices (arguments and fixed)
+   #        SRA added dictionary "lawisDirs" contain the lawis directory information at the top level
+#16/07/2026 SRA edited to include seperate flood risk code (flood_risk.py) taking flood risk out of main loop  
+#           SRA proess_realtime_fns.py extracts commune point NFLICS probabilites to file
+#               flood_risk.py then reads them in.  
+#           SRA changes to set only one user specific "user" variabe to swap between
+#               offline directories
 import os,glob,shutil,sys, re
 
 import netCDF4 as nc  
 import process_realtime_fns as fns   #will need to move this code into sftp_extract directory
+import flood_risk as risk
 import time
 import datetime
 import argparse
@@ -60,10 +74,9 @@ parser.add_argument("--startDate", type=str, help="Start Date (YYYYMMDDhhmm).")
 parser.add_argument("--endDate", type=str, help="Start Date (YYYYMMDDhhmm).")
 
 # to portal
-
 parser.add_argument("--toPortal", type=str2bool, default = True, help="Send data to portal (True) or local (False)")
 
-# feed (eumdat [.nc files], historical [.gra])  
+# Data type feed (eumdat [.nc files], historical [.gra])  
 parser.add_argument("--feed", choices=["eumdat","historical"],default ='eumdat', help="Feed data source: EUMDAT(eumdat) or raw .gra (historical)")
 
 # folder structure of historical data
@@ -72,7 +85,6 @@ parser.add_argument("--feed", choices=["eumdat","historical"],default ='eumdat',
 # 'YMD'    (in mirror_path/YYYY/MM/DD)
 # 'YM'     (in mirror_path/YYYY/MM)
 parser.add_argument("--fStruct", choices=["direct","YMD","YM"],default ='direct', help="Folder structure for historical data: direct, YMD, or YM")
-
 
 args = parser.parse_args()
 if args.runmode =='historical':
@@ -118,22 +130,27 @@ print("Running in "+runtype+" mode")
 print("Sending outputs to Africa Nowcast portal: "+str(args.toPortal))
 print("Processing using feed: "+args.feed)
 
+user="stewells"
+
 if runtype=='realtime':
    # mirror_path = '/scratch/NFLICS/sftp_extract/current'   # path to NCAS mirror 
     #mirror_path = '/mnt/scratch/cmt'
     mirror_path = '/mnt/scratch/stewells/MSG_NRT/cut/'
     backup_mirror = '/mnt/scratch/cmt'
     #mirror_path = '/users/hymod/stewells/NFLICS/SSA/sample_live/'
+
 else:
     #mirror_path = '/mnt/scratch/cmt'
-    mirror_path = '/mnt/scratch/stewells/MSG_NRT/cut/'
-    backup_mirror = '/mnt/scratch/stewells/MSG_NRT/cut/'
+    #mirror_path = '/mnt/scratch/stewells/MSG_NRT/cut/'
+    #backup_mirror = '/mnt/scratch/stewells/MSG_NRT/cut/'
     #mirror_path = '/scratch/NFLICS/sftp_extract/current/'
-      #mirror_path = '/prj/nflics/real_time_data/2024/01/08/' # path to where historical NCAS raw data to process is held
+    mirror_path = '/mnt/prj/nflics/real_time_data/' # path to where historical NCAS raw data to process is held
+    backup_mirror = mirror_path
+
     #mirror_path = '/mnt/prj/nflics/real_time_data/'
 
 
-
+print("mirror path:",mirror_path)  #SRA
 shadow_run=False
 ##################################################
 #Error handelling using the signal package
@@ -161,7 +178,6 @@ db_version = sys.argv[2] if len(sys.argv)>2 else 3  # latest
 #Mirror data from NCAS sftp site
 ##################################################
 # list the files currently in the mirror
-
 def get_data(mirror_path,shadow_run,db_version,backup_mirror):
     ##################################################
     #Set up paths 
@@ -252,15 +268,53 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
     #datadir ="/prj/NC_Int_CCAd/3C/seodey/data/historical_database/msg9_cell_shape_wave_rect_2004001to20190930_WA_v2
 	###datadir="/prj/nflics/historical_database/msg9_cell_shape_wave_rect_20040601to20190930_realtime/msg9_cell_shape_wave_rect_" #historical database
     
+    if user=="seodey":
+        lawisDirs={"viaSDir":'/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data',
+               "mntDir":'/mnt/HYDROLOGY_stewells/',
+               "offlineDir":'/mnt/users/hymod/seodey/NFLICS/nflics_current/'}
+    else:
+        lawisDirs={"viaSDir":'/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data',
+               "mntDir":'/mnt/HYDROLOGY_stewells/',
+               "offlineDir":'/mnt/HYDROLOGY_stewells/'}
+
+    options={"do_extended_core_calcs":False,
+            "do_lst_adjustments" :False,
+            "do_shared_plots":True,
+            "do_point_timeseries" : True,
+            "do_geotiff" : True, #Needs to be true to output the timeseris
+            "output_site_cores":True,
+            "runtype":runtype,
+            # OPTIMISATION OPTIONS
+            "opt_geotiff" : True,
+            "opt_geotiff_float32":True,
+            "opt_geotiff_ndpls" : 2,
+            "extract_riskpt": True,
+             "nflics_output_version_portal": 2,
+             "run_risk":True             #
+}   
+    if user=="seodey":
+        options["code_dir"]="/mnt/users/hymod/seodey/NFLICS/AfricaNowcasting/"
+    else:
+        options["code_dir"]="/home/stewells/AfricaNowcasting/rt_code/"
+            
     if run_offline:
-        plotbase="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/nflics_nowcasts/"
-        daily_base="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/daily_summary_plots_test"
-        scratchbase="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/nflics_current/"    #plots go here
+        if user=="seodey":
+            plotbase="/mnt/users/hymod/seodey/NFLICS/nflics_nowcasts/"
+            daily_base="/mnt/users/hymod/seodey/NFLICS/daily_summary_plots"
+            scratchbase="/mnt/users/hymod/seodey/NFLICS/nflics_current/"    #plots go here
+        else:
+            plotbase="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/nflics_nowcasts/"
+            daily_base="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/daily_summary_plots_test"
+            scratchbase="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/nflics_current/"    #plots go here
+        
         lst_path="/mnt/prj/swift/SEVIRI_LST/data_anom_wrt_historic_clim_withmask"
         rt_code_input="/mnt/prj/nflics/RT_code_v2_input/"
         #rt_save="/users/hymod/stewells/NFLICS/NFLICS_scw/real_time_data/" 
         rt_save="/mnt/prj/nflics/real_time_data/"  
+        archiveDir= scratchbase
+        lawisDirs["lawisOffline"]=True
     else:
+        archiveDir= '/mnt/prj/nflics/rt_cores/'
         scratchbase="/mnt/scratch/NFLICS/nflics_current/"
     #      #plots go here
         plotbase="/mnt/prj/nflics/nflics_nowcasts/"      #plots go here
@@ -269,6 +323,7 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
         rt_save="/mnt/prj/nflics/real_time_data/"        #archive of real time data from ncas
         lst_path="/mnt/prj/swift/SEVIRI_LST/data_anom_wrt_historic_clim_withmask"
         rt_code_input="/mnt/prj/nflics/RT_code_v2_input/"
+        lawisDirs["lawisOffline"]=False
     remote_path="/anacimcehrw/w"
     months={"05":"May","06":"June","07":"July","08":"August","09":"September"} #not sure this is actually used???
 
@@ -279,19 +334,24 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
     #feed="ncas"
     #feed = 'historical'
     #feed = 'eumdat'
-    feed = args.feed
-    ukceh_mirror=False
-    make_gif=False
+
+    options["feed"] = args.feed
+    options["ukceh_mirror"]=False
+    options["make_gif"]=False
     #overwrite = False
     ######### shadow run options #######################
     #run shadow run can be set to run 15-minutes behind the main run for contingency against machine problems
 	
     #settings only used when shadow_run==True
     if run_offline:
-        save_plotbase="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/nflics_nowcasts_test/"      #plots go here
-        save_scratchbase="/mnt/scratch/stewells/nflics_current/"  #plots go here
-		
-        save_rt_save="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/real_time_data/"        #archive of real time data from ncas
+        if user=="seodey":
+            save_plotbase="/mnt/users/hymod/seodey/NFLICS/nflics_nowcasts_test/"      #plots go here
+            save_scratchbase="/mnt/scratch/seodey/nflics_current/"  #plots go here
+            save_rt_save="/mnt/users/hymod/seodey/NFLICS/real_time_data/"        #archive of real time data from ncas
+        else:
+            save_plotbase="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/nflics_nowcasts_test/"      #plots go here
+            save_scratchbase="/mnt/scratch/stewells/nflics_current/"  #plots go here
+            save_rt_save="/mnt/users/hymod/stewells/NFLICS/NFLICS_scw/real_time_data/"        #archive of real time data from ncas
     else:
         save_plotbase="/mnt/prj/nflics/nflics_nowcasts/"      #plots go here
         save_scratchbase="/mnt/scratch/NFLICS/nflics_current/"
@@ -303,22 +363,23 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
 
         use_file=use_file.split("/")[-1] #remove directory (want file name only)
 
-
-
         print("processing file:", use_file)
-        if feed=='historical':
-            use_year=use_file[:4]
-            use_month=use_file[4:6]
-            use_day=use_file[6:8]
-            use_time=use_file[8:12] 
-             
+        if options["feed"]=='historical':
+            #use_year=use_file[:4]       #SRA older historical files
+            #use_month=use_file[4:6]
+            #use_day=use_file[6:8]
+            #use_time=use_file[8:12] 
+            use_year=use_file[10:14]    #new hisotrical files
+            use_month=use_file[14:16]
+            use_day=use_file[16:18]
+            use_time=use_file[19:23]
         else: 
             use_year=use_file[10:14]
             use_month=use_file[14:16]
             use_day=use_file[16:18]
             use_time=use_file[19:23]
+            
         tnow=use_year+use_month+use_day+use_time
-        
         ###############################################
         #1. copy the rt data to somewhere safe
         #print("Move observed image to database")
@@ -328,10 +389,13 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
             os.makedirs(savedir)
         else:
             pass
-        sfile =use_file[:-3]+'_eumdat.nc' if  feed=='eumdat' else use_file
-        #print(sfile)
+
+        sfile =use_file[:-3]+'.nc' if  options["feed"]=='eumdat' else use_file
+
+        print(use_file,sfile)
 # if file already in saved folder assume processed and exit function for this file
-   
+        print(os.path.join(savedir,sfile))
+        print(os.path.exists(os.path.join(savedir,sfile)))
         if not os.path.exists(os.path.join(savedir,sfile)):
             shutil.copy2(sourcePath,os.path.join(savedir,sfile))
         else:
@@ -342,8 +406,8 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
                 return
         
         vis_file = 'VIS_006_rad_'+use_year+use_month+use_day+'_'+use_time+'.nc'
-        sfile = vis_file[:-3]+'_eumdat.nc' if  feed=='eumdat' else vis_file
-        #print(vis_file)
+        sfile = vis_file[:-3]+'_eumdat.nc' if  options["feed"]=='eumdat' else vis_file
+        print(vis_file)
         if os.path.exists(os.path.join(os.path.dirname(sourcePath),vis_file)):# visible channel exists, so copy it too
             if not os.path.exists(os.path.join(savedir,sfile)):
                 shutil.copy2(os.path.join(os.path.dirname(sourcePath),vis_file),os.path.join(savedir,sfile))            
@@ -388,12 +452,17 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
         ###############################################
         #3. calculate nowcasts
 		
-		
-        fns.process_realtime_v3(tnow,datadir,os.path.dirname(sourcePath),plotdir,scratchbase,lst_path,nflics_base,rt_code_input,feed,db_version)
+        fns.process_realtime_v3(tnow,datadir,os.path.dirname(sourcePath),plotdir,scratchbase,lst_path,nflics_base,rt_code_input,archiveDir,lawisDirs,options)
         
-        #fns.process_realtime_v3(tnow,datadir,mirror_path,plotdir,scratchbase,lst_path,nflics_base,rt_code_input,feed,db_version)
-            
-        if ukceh_mirror==True:
+        ###############################################
+        #3B . RUN FLOOD RISK
+        if options["run_risk"]:
+            print("running Dakar flood risk")
+            risk.run_flood_risk(tnow,lawisDirs,options,plotbase)
+        else:    
+            pass
+        
+        if options["ukceh_mirror"]==True:
             remotedir=os.path.join(remote_path,"nflics_nowcasts",use_year,use_month,use_day,use_time)
             remotedir_daily_summary=os.path.join(remote_path,"daily_summary_plots")
             daily_summary_dir=daily_base
@@ -411,7 +480,7 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
                     os.system("cp -r "+os.path.join(rt_save,use_year,use_month,use_day)+"/*"+use_time+".nc "+os.path.join(save_rt_save,use_year,use_month,use_day))
         else:
             pass
-        if make_gif and int(db_version)==2:
+        if options["make_gif"] and int(db_version)==2:
             if len(glob.glob(os.path.join(plotbase,use_year,use_month,use_day,use_time,'Nowcast_v2*.png')))>0:
                 os.system('convert -delay 60 -loop 0 '+'/'.join([plotbase,use_year,use_month,use_day,use_time])+'/Nowcast_v2*.png '+'/'.join([plotbase,use_year,use_month,use_day,use_time])+'/Nowcast_v2_'+''.join([use_year,use_month,use_day,use_time])+'_000_360.gif')
             else:

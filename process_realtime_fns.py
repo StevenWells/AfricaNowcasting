@@ -1,3 +1,13 @@
+
+#27/04/2026 SRA added function get_grid_from_ll to replace the point-location wrt grid calculations
+#           SRA edited the point locations to be read in from a point location file
+#           SRA edited point locations to be saved in a dictionary (keys=names, data=[lat,lon])
+#10/06/2026 SRA updated msg_x and msg_y to use the commune msg points lat and lon to get the
+#                msg points at commune locatgions. This avoids domain-specific fixe.
+#                a new file dakar_grid_v4 is used. This is created in flood_risk.py
+#           SRA     get_grid_from_ll swapped for get_grid_from_ll_2d throughout (accounts for non-uniformity in grid)
+#11/06/2026 SRA tidied up, removed commented-out old versions and re-commented in sections
+#08/07/2026 SRA moved function plot_slice_risk to flood_risk.py
 import numpy as np
 import numpy.ma as ma
 import matplotlib as mpl
@@ -27,14 +37,18 @@ import netCDF4 as nc
 # include Conni's ccores package
 sys.path.append('/mnt/users/hymod/seodey/NFLICS/')
 import ccores.cores as cores
+
+
 ##################################################
 # Main function to create the nowcasts
 ###############################################
-def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_base,rt_code_input,feed,db_version):
+def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_base,rt_code_input,archiveDir,lawisDirs,options):
     processClock= time.time()
     
-	
-    do_full_nowcast = ['wa','sadc']  # 'wa', 'sadc'
+    code_dir=options["code_dir"]
+    do_full_nowcast = ['wa','sadc']  #NFLICS nowcasts are for two domains
+    
+    #Flood Risk. WILL BE REMOVED SRA-------------------------
 	# initialise risk
     do_risk_subdomain = {x:False for x in do_full_nowcast}	
     
@@ -43,6 +57,7 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 	
     do_risk_months = {'wa':[],'sadc':[]}
     nowcast_months = {'wa':['01','02','03','04','05','06','07','08','09','10','11','12'],'sadc':['01','02','03','04','05','06','07','08','09','10','11','12']}
+    #---------------------------------------------------------
     
     # set up whether to run nowcast
     tnow_month = tnow[4:6]
@@ -50,72 +65,57 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         if not tnow_month in nowcast_months[idomain]:		    
             do_full_nowcast.remove(idomain)
 
+    #Flood Risk. WILL BE REMOVED SRA-------------------------
     #set up whether to do risk calcs (only JJAS WA at the moment?
 	# default is all off, this loop turns them on based on do_risk_months
     for idomain in do_full_nowcast:	
         if tnow_month in do_risk_months[idomain]:
             do_risk_subdomain[idomain] = True
-		
-		
-    do_extended_core_calcs=False
-    do_lst_adjustments =False
-    do_shared_plots=True
-    do_point_timeseries = True
-    do_geotiff = True
-    output_site_cores=True
+	#---------------------------------------------------------
+	#code options	
+    do_extended_core_calcs=options["do_extended_core_calcs"]
+    do_lst_adjustments =options["do_lst_adjustments"]
+    do_shared_plots=options["do_shared_plots"]
+    do_point_timeseries = options["do_point_timeseries"]
+    do_geotiff = options["do_geotiff"]#Needs to be true to output the timeseris
+    output_site_cores=options["output_site_cores"]
 
-   # OPTIMISATION OPTIONS
-    opt_geotiff = True
-    opt_geotiff_float32=True
-    opt_geotiff_ndpls = 2
+   # optimisation options
+    opt_geotiff = options["opt_geotiff"]
+    opt_geotiff_float32=options["opt_geotiff_float32"]
+    opt_geotiff_ndpls = options["opt_geotiff_ndpls"]
 
-	
-   # version_maj = Main product version
-   # version_min = LMF on = 2, LMF off = 1, Testing/non official version = 0
-   # version_submin = LMF version being used (0=None, 1 = Connis LMF, 2 = Chris LMF)
-
+   # versions:
+   #    version_maj = Main product version
+   #    version_min = LMF on = 2, LMF off = 1, Testing/non official version = 0
+   #    version_submin = LMF version being used (0=None, 1 = Connis LMF, 2 = Chris LMF)
     version_maj =    {'full':4,'wa':4, 'sadc':5}
     version_min =    {'full':0,'wa':1, 'sadc':0}
     version_submin = {'full':0,'wa':1, 'sadc':0}
-	
-	
-    #version_maj  = 3
-    #version_min = 1  # LMF on = 2, LMF off = 1, Testing/non official version = 0
-    #version_submin = 0  # LMF version being used (0=None, 1 = Connis LMF, 2 = Chris LMF)
 
     dom_suffix = {'wa':'','sadc':'_sadc'} #WA kept as is
 
-    #-------------------------------------------------------------------------------
-    # Name:     process_realtime_v3.p
-    #-------------------------------------------------------------------------------
+    #NFLICS grid options
     n_inner=41     #size in grid points of the inner square used for selecting from the historical database
     nadd=20         #number of additional points eachgvhh side to add for getting historical sample
     n_search=6
     do_irregular_lts = True
     t_search=60
-   
     search_freq=60
-    # lead time in hours (used if irregularly spaced)
-    if do_irregular_lts:
+    if do_irregular_lts:    # lead time in hours (used if irregularly spaced)
         tsearch_irr = [0,1,2,3,4,5,6,8,10,12]
 	
-	
-    #plot_area=[8,-20,20,0]		        #ll_lat,ll_lon,urlat,urlon in degrees
-	
-    #plot_area_ex=[4,-23.5,20,30]         #ll_lat,ll_lon,urlat,urlon in degrees for extended region core calculations
-    #plot_area_ex=[4,-23,20,32]
-    #plot_area_ex=[4,-21,20,32]
+
     plot_area_ex = [-41,-27,27,79] #FULL DOMAIN
-    plot_area = plot_area_ex  #test, set to be the same as the extended area for nowcasts
-    #plot_area_sub = {'wa':[4,-23,20,32],'sadc':[-38,8,0,55]} # 
+    plot_area = plot_area_ex  #test, set to be the same as the extended area for nowcasts SRA?????????
     plot_area_sub =  {'wa':[-2,-23,20,32],'sadc':[-38,8,0,55]}	# now going further south
     #nx = 1804 #CHris' data  
     nx=2268                   #Specify grid size. origional resolution data (cells not calculated)
     ny=2080
     nx_dakarstrip=164 
     ny_dakarstrip=580
-    blob_dx=0.04491576 #approx 5km over WAfrica for calculation of shape_wave (non-circular Blobs from Coni's code)
-    blob_dx_3km=0.026949456 # approx 3km
+    blob_dx=0.04491576 #approx 5km over WAfrica for calculation of shape_wave (non-circular Blobs from Coni's code) GEO TIFF 5KM
+    blob_dx_3km=0.026949456 # approx 3km INTRODUCED FOR VIS - GEO TIFF 3KM
     #filters_real_time=range(9,23,2)
     #filters_real_time = [15]*7
 	# these are defined for EVERY HOUR, even if some hours are not included in the tsearch_irr
@@ -144,7 +144,6 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     mask_dir= {}
     mask_dir['sadc'] = '/mnt/prj/NC_Int_CCAd/3C/seodey/data/historical_database/Counts_2004to2019_'
     mask_dir['wa'] = '/mnt/prj/NC_Int_CCAd/3C/seodey/data/historical_database/WCA/Counts_2004to2019_'
-    archiveDir= '/mnt/prj/nflics/rt_cores/'
     
    # datadir['sadc'] ="/prj/nflics/historical_database/date_split_SADC_v2_realtime/msg9_cell_shape_wave_rect_20041101to20191130_SADC_v2/msg9_cell_shape_wave_rect_"
    # datadir['wa'] =  "/prj/nflics/historical_database/date_split_WA_v2_realtime/msg9_cell_shape_wave_rect_20040601to20190930_WA_v2/msg9_cell_shape_wave_rect_"
@@ -152,11 +151,15 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     #datadir['sadc'] ="/prj/NC_Int_CCAd/3C/seodey/data/historical_database/msg9_cell_shape_wave_rect_20040201to20190228_SADC_v2/msg9_cell_shape_wave_rect_"
       #  datadir['sadc'] +=["/prj/NC_Int_CCAd/3C/seodey/data/historical_database/msg9_cell_shape_wave_rect_"+dstring+"_SADC_v2/msg9_cell_shape_wave_rect_"]
     # point timeseries Info
-    pt_locn_names,pt_locn_locs = {},{}
-    pt_locn_names['wa'] = ['Dakar','Matam','Tambacounda','Ziguinchor','Kaolack','Iles de Saloum']
-    pt_locn_locs['wa'] = [[14.734,-17.468],[15.658,-13.256],[13.773,-13.667],[12.577,-16.272],[14.160,-16.07],[13.663,-16.642]]  #[lat,lom]
-    pt_locn_names['sadc'] = ['Chisamba_Chipembi', 'Kabwe_Mulungushi Univ', 'Chisamba_Gart farm', 'Mufulira_Kafironda', 'Kafulafuta_Police yard', 'Kitwe_University Cumpas', 'Katete_Katete FTC', 'Chama_Chama Ftc', 'Katete_Agric Camp', 'Lusaka_Unza', 'chongwe_KKIA', 'Luangwa_Kaunga', 'Lusaka_Unza Agric', 'Chiengi_Chiengi school', 'Milenge_Milenge', 'Nakonde_Mwenzo school', 'Mafinga_Ntendele school', 'Luwingu_school Sec School', 'Chilubi Island_Chilubi school', 'Mpulungu_Mpulungu school', 'Nsenga Hill_school', 'Kabompo_Met Yard', 'Mwinilunga_Met office', 'Kalumbila_mine site', 'Maamba_mine office', 'Gwembe_Muyunbwe', 'Chirundu_Lusitu FTC', 'Monze_kanchomba Ftc', 'Kazungula_Nyawa', 'Kaoma_Met office', 'Lukulu_Council office', 'Mulobezi_Sichili school', 'Sesheke_Met office', 'Kalabo_Met office', 'Mongu_Kataba']
-    pt_locn_locs['sadc'] = [[-14.928, 28.576], [-14.291, 28.567], [-14.94656, 28.08952], [-12.613, 28.179], [-13.31669, 28.75317], [-12.774, 28.207], [-14.083, 32.061], [-11.24, 33.155], [-14.1046, 31.9201], [-15.391, 28.332], [-15.319, 28.44], [-15.61973, 30.40192], [-15.39463, 28.33722], [-8.653, 29.164], [-12.123, 29.69], [-9.333, 32.755], [-10.263, 33.374], [-10.252, 29.906], [-10.769, 30.282], [-8.773, 31.117], [-9.36441, 31.24967], [-13.596, 24.208], [-11.74, 24.431], [-12.26875, 25.3051], [-17.34, 27.187], [-16.629, 27.772], [-16.1454, 26.7912], [-16.594, 27.494], [-17.19152, 25.89093], [-14.798, 24.804], [-14.342, 23.244], [-16.712, 24.952], [-17.477, 24.301], [-14.989, 22.682], [-15.445, 23.351]]
+       
+    pt_locns={}
+    for dom in ['wa','sadc']:
+        loc_dat=pd.read_csv("/mnt/prj/nflics/geoloc_grids/point_loc/point_loc_"+dom+"_v1.csv",index_col="name")
+        pt_locns[dom]=dict(zip(loc_dat.index.to_list(),loc_dat.to_numpy()))
+
+    #save the locations 
+    #pd.DataFrame(pt_locn_locs['sadc'],columns=["lat","lon"],index=pt_locn_names['sadc']).to_csv("/mnt/prj/nflics/geoloc_grids/point_loc/point_loc_sadc_v1.csv",index=True,index_label="name")
+    #pd.DataFrame(pt_locn_locs['wa'],columns=["lat","lon"],index=pt_locn_names['wa']).to_csv("/mnt/prj/nflics/geoloc_grids/point_loc/point_loc_wa_v1.csv",index=True,index_label="name")
     
     # Define Nflics output version by db_version argument  1 = extended cores ON, version-dependent plots ON, shared plots ON, suffix 'v1', 
     #                               2 = extended cores OFF, version-dependednt (inc LST) plots ON, shared plots OFF, suffix 'v2'
@@ -164,18 +167,23 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 	
 	# subdomain geoloc file
     geoloc_sub_file = {}
-    pt_locn_names_full,pt_locn_locs_full = [],[]
+    pt_locns_full={}
+    #pt_locn_names_full,pt_locn_locs_full = [],[]
     squares_file= {}
+
     for dom in do_full_nowcast:
         sqDom = dom
         if dom =='wa':
             sqDom = 'wca'
-
+            
         squares_file[dom] = nflics_base+"/geoloc_grids/msg_rect_ALLhr_ninner"+str(n_inner)+'_'+sqDom+'.nc'
         # also combine the site names
-        pt_locn_names_full+=pt_locn_names[dom]
-        pt_locn_locs_full+=pt_locn_locs[dom]
-    geotiff_outpath = get_portal_outpath('CTT',tnow,viaS = True)
+        #pt_locn_names_full+=pt_locn_names[dom]
+        #pt_locn_locs_full+=pt_locn_locs[dom]
+        #pt_locns_full=pt_locns_full|pt_locns[dom]
+        pt_locns_full.update(pt_locns[dom])
+        
+    geotiff_outpath = get_portal_outpath('CTT',tnow,lawisDirs,viaS = True)
     #geotiff_outpath = '/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data'
     #geotiff_outpath = '/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/ssa_test_feed'
     #geotiff_outpath = '/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/tmp'
@@ -190,10 +198,10 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     nflics_output_version = {}
     for dom in ['full','wa','sadc']:
         nflics_output_version[dom]='_'.join([str(version_maj[dom]),str(version_min[dom]),str(version_submin[dom])])
-    #nflics_output_version['sadc']='_'.join([str(version_maj),str(version_min),str(version_submin)])
+
 # For situations in which the version of the processing is different from what is currently reuqired by the portal (ie in testing)
 # This will only affect the filename on the portal, where there is a hard-coded pattern match working. 
-    nflics_output_version_portal = 2 #
+    
 
     #-------------------------------------------------------------------------------
     # Derived variables
@@ -201,42 +209,42 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     # full domain in 5km grid
     ds_grid_info=process_grid_info(nx,ny,nx_dakarstrip,ny_dakarstrip,blob_dx,plot_area,nflics_base)
 	
-	# do sub domains
+	# subdomains for NFLICS calculations
     if 'sadc' in do_full_nowcast:
         geoloc_sub_file['sadc'] = process_grid_info(nx,ny,-1,-1,blob_dx,plot_area_sub['sadc'],nflics_base)
     if 'wa' in do_full_nowcast:
-        #geoloc_sub_file['wa'] = process_grid_info(1640,580,nx_dakarstrip,ny_dakarstrip,blob_dx,plot_area_sub['wa'],nflics_base)
         geoloc_sub_file['wa'] = process_grid_info(nx,ny,-1,-1,blob_dx,plot_area_sub['wa'],nflics_base)	
     grid_lims_p=ds_grid_info["grid_lims_p"].data
     # for visible being done on 3km grid
     ds_grid_info_3km=process_grid_info(nx,ny,nx_dakarstrip,ny_dakarstrip,blob_dx_3km,plot_area,nflics_base)
 
 
-    if do_extended_core_calcs:
-        ds_grid_info_ex=process_grid_info(nx,ny,nx_dakarstrip,ny_dakarstrip,blob_dx,plot_area_ex,nflics_base)
-        #ds_grid_info_ex=process_grid_info(nx,ny,nx_dakarstrip,ny_dakarstrip,blob_dx,plot_area_ex,nflics_base)
+    if do_extended_core_calcs:  # Past option for cores calculated on two grids in parallel
         ds_grid_info_ex=process_grid_info(nx,ny,nx_dakarstrip,ny_dakarstrip,blob_dx,plot_area_ex,nflics_base)
         ds_grid_info_ex_3km=process_grid_info(nx,ny,nx_dakarstrip,ny_dakarstrip,blob_dx_3km,plot_area_ex,nflics_base)
         grid_lims_ex=ds_grid_info_ex["grid_lims_p"].data
 
-    #--------------------------------------------------------------------------
-    # Read in the cell grids where available
-    #-------------------------------------------------------------------------------
-    # get the required dates
-    dt_now=datetime.datetime.strptime(tnow,"%Y%m%d%H%M")
+ #############################################################
+ #Sort times: datetimestamp,lead times
+ #############################################################
+    dt_now=datetime.datetime.strptime(tnow,"%Y%m%d%H%M")    # get the required dates
     #timestamps for forecast time
     if do_irregular_lts:
         use_times = [dt_now+pd.Timedelta(minutes=60*isearch) for isearch in tsearch_irr]
     else:
-        use_times=pd.date_range(dt_now,dt_now+pd.Timedelta(minutes=60*n_search),freq="60min") 
-	 
+        use_times=pd.date_range(dt_now,dt_now+pd.Timedelta(minutes=60*n_search),freq="60min") 	 
     time_strs=[str(time).replace("-","").replace(" ","").replace(":","") for time in use_times]
     #forecast lead time in minutes 
     if do_irregular_lts:
         t_searches = [60*isearch for isearch in tsearch_irr]
     else:
         t_searches=list(range(0,(n_search+1)*(search_freq),search_freq))
-    if feed=="historical":
+        
+ #############################################################
+ #Read in the MSG data: options for feed == historical, eumdata or ncast
+ #############################################################
+
+    if options["feed"]=="historical": #historical .gra files
 		
         latlons = get_dummy_ssa_latlon()
         rt_lats=latlons[0]
@@ -245,13 +253,6 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 		# calling the SSA domain image (to be used for both WA and full SSA
         data_all = load_data(use_times[0],[nx,ny,nx_dakarstrip,ny_dakarstrip],"ssa")
 		
-        #grid_lims_ex=ds_grid_info_ex["grid_lims_p"].data
-        #rt_lats=np.array(ds_grid_info_ex['lats_edge'][...])  
-        #rt_lons=np.array(ds_grid_info_ex['lons_edge'][...])
-
-        #if do_extended_core_calcs:
-        #    data_all_ex = data_all[grid_lims_ex[0]:grid_lims_ex[2],grid_lims_ex[1]:grid_lims_ex[3]]
-
         grid_lims_rt=[np.where(rt_lats[:,0]>plot_area[0])[0][0],np.where(rt_lons[0,:]>plot_area[1])[0][0],
                np.where(rt_lats[:,0]<plot_area[2])[0][-1],np.where(rt_lons[0,:]<plot_area[3])[0][-1]]
         data_all=data_all[grid_lims_rt[0]:grid_lims_rt[2],grid_lims_rt[1]:grid_lims_rt[3]][:-1,]              
@@ -262,33 +263,30 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         data_all_vis = np.zeros((data_all.shape))*np.nan
 		# crop to RT domain
 
-
-
         if do_extended_core_calcs:
             rt_lats_ex = np.copy(rt_lats)
             rt_lons_ex = np.copy(rt_lons)
             data_all_ex = np.copy(data_all)
+            
         grid_lims_rt=[np.where(rt_lats[:,0]>plot_area[0])[0][0],np.where(rt_lons[0,:]>plot_area[1])[0][0],
                np.where(rt_lats[:,0]<plot_area[2])[0][-1],np.where(rt_lons[0,:]<plot_area[3])[0][-1]]
 			   
 			   
         data_all=data_all[grid_lims_rt[0]:grid_lims_rt[2],grid_lims_rt[1]:grid_lims_rt[3]][:-1,]
 
-    elif feed=="eumdat":
-        rt_file=rt_dir+"/IR_108_BT_"+tnow[:8]+"_"+tnow[-4:]+".nc"
-
+    elif options["feed"]=="eumdat":
+        rt_ext = '' if options["runtype"]=='realtime' else '_eumdat'
+        rt_file=rt_dir+"/IR_108_BT_"+tnow[:8]+"_"+tnow[-4:]+rt_ext+".nc" ##sra 2026
         rt_lats,rt_lons,data_all=get_rt_data(rt_file,ftype='ir108_bt',haslatlon=False)
 
         if do_extended_core_calcs:
             rt_lats_ex = np.copy(rt_lats)
             rt_lons_ex = np.copy(rt_lons)
             data_all_ex = np.copy(data_all)
-      
-		
+      		
         latlons = get_dummy_ssa_latlon()
         rt_lats=latlons[0,:,:]
         rt_lons=latlons[1,:,:]
-
 		
         data_all_vis = np.zeros(data_all.shape)*np.nan
         if do_geotiff:
@@ -300,11 +298,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
                 rt_vis_lons = rt_lons
                 rt_vis_lats =   rt_lats  
 
-
-
             else:    
                 data_all_vis = np.zeros(data_all.shape)*np.nan		
-        #print([rt_vis_lons.shape,data_all_vis.shape])
 
     elif feed=="ncas":
         rt_file=rt_dir+"/IR_108_BT_"+tnow[:8]+"_"+tnow[-4:]+".nc"
@@ -314,32 +309,10 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
             rt_lats_ex = np.copy(rt_lats)
             rt_lons_ex = np.copy(rt_lons)
             data_all_ex = np.copy(data_all)
-        #print(data_all.shape) 
-        #print(rt_lats[...][:,0])
-        #print(rt_lats[...][:,100])
-        #print(np.array(ds_grid_info['lats_mid'][...])[:,0])
-        #for ij in range(rt_lons.shape[0]):
-        #grid_lims_rt = [np.where(rt_lats[:,0]>plot_area[0])[0][0],0,
-		#     np.where(rt_lats[:,0]>plot_area[0])[0][0]+557,1803]  
-		
+   		
         latlons = get_dummy_ssa_latlon()
         rt_lats=latlons[0]
         rt_lons=latlons[1]
-       # grid_lims_rt = [np.where(rt_lats[:,0]>plot_area[0])[0][0],np.where(rt_lons[1591,:]>plot_area[1])[0][0],
-	#	     np.where(rt_lats[:,0]>plot_area[0])[0][0]+557,np.where(rt_lons[1591,:]>plot_area[1])[0][0]+1803]    
-        #grid_lims_rt=[np.where(rt_lats[:,0]>plot_area[0])[0][0],np.where(rt_lons[0,:]>plot_area[1])[0][0],
-         #        np.where(rt_lats[:,0]<plot_area[2])[0][-1],np.where(rt_lons[0,:]<plot_area[3])[0][-1]]
-     
-	    
-		
-		
-        #grid_lims_rt=[np.where(rt_lats[:,0]>plot_area[0])[0][0],np.where(rt_lons[0,:]>plot_area[1])[0][0],
-        #         np.where(rt_lats[:,0]<plot_area[2])[0][-1],np.where(rt_lons[0,:]<plot_area[3])[0][-1]]
-            #print([ij,grid_lims_rt,grid_lims_rt[3]-grid_lims_rt[1]])   
-       
-        #data_all=data_all[grid_lims_rt[0]:grid_lims_rt[2],grid_lims_rt[1]:grid_lims_rt[3]][:-1,]
-
-		
 		
         data_all_vis = np.zeros(data_all.shape)*np.nan
         if do_geotiff:
@@ -352,34 +325,32 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
             else:    
                 data_all_vis = np.zeros(data_all.shape)*np.nan
             
-                
-
-
     missing=[np.all(np.isnan(grid)) for grid in data_all]
+    print("Missing LST data length:",len(missing))
     
-    #-------------------------------------------------------------------------------
-    # Regrid and Calculate the core information
-    #-------------------------------------------------------------------------------
-    #grid information for the NFLICS domain grid used for the historical database
+ #############################################################
+ #Sort out the geolocations
+ #############################################################
+ 
+ #Full domain & 5km grid
     lats_edge=np.array(ds_grid_info['lats_edge'][...])  
     lons_edge=np.array(ds_grid_info['lons_edge'][...])
     lats_mid=np.array(ds_grid_info['lats_mid'][...])
     lons_mid=np.array(ds_grid_info['lons_mid'][...])
     blobs_lons=np.array(ds_grid_info['blobs_lons'][...])
     blobs_lats=np.array(ds_grid_info['blobs_lats'][...])
-    # 3km arrays for the visual data
+ #Full domain & 3km grid
     blobs_lons_3km=np.array(ds_grid_info_3km['blobs_lons'][...])
     blobs_lats_3km=np.array(ds_grid_info_3km['blobs_lats'][...])
     grid_lims_full=ds_grid_info["grid_lims_p"].data
+ #cut-down to grid limits (full domain). TIR and vis data
     data_all=data_all[grid_lims_full[0]:grid_lims_full[2],grid_lims_full[1]:grid_lims_full[3]]
     data_all_vis=data_all_vis[grid_lims_full[0]:grid_lims_full[2],grid_lims_full[1]:grid_lims_full[3]]
-
-# get subdomain latslons
-    lons_mid_sub, lats_mid_sub,blobs_lons_sub, blobs_lats_sub = {},{},{},{}
+ #NFLICS subdomains wca and sadc
+    lons_mid_sub, lats_mid_sub,blobs_lons_sub, blobs_lats_sub = {},{},{},{} #grids 
     lons_edge_sub, lats_edge_sub = {},{}
-    pt_locn_locs_rc	, pt_locn_locs_rc_fixed = {},{}	
-    pt_locn_locs_rc_full,pt_locn_locs_rc_full_fixed = [],[]
-	#for dom in list(do_full_nowcast.keys()):
+    pt_locn_locs_rc	, pt_locn_locs_rc_fixed = {},{}	#point locations
+    pt_locn_locs_rc_full,pt_locn_locs_rc_full_fixed = {},{}
     for dom in do_full_nowcast:        
         lons_mid_sub[dom] = np.array(geoloc_sub_file[dom]['lons_mid'][...])
         lats_mid_sub[dom] = np.array(geoloc_sub_file[dom]['lats_mid'][...])
@@ -388,9 +359,6 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         blobs_lons_sub[dom] = np.array(geoloc_sub_file[dom]['blobs_lons'][...])
         blobs_lats_sub[dom] = np.array(geoloc_sub_file[dom]['blobs_lats'][...])
 		
-		#hndl_nc.where(hndl_nc.apply(np.isfinite)).fillna(0.0)
-        #plt.imshow(lons_edge_sub[dom])
-        #plt.show()
         lats_edge_sub[dom][np.isnan(lats_edge_sub[dom])] = -999
         lons_edge_sub[dom][np.isnan(lons_edge_sub[dom])] = -999
         lats_mid_sub[dom][np.isnan(lats_mid_sub[dom])] = -999
@@ -399,91 +367,81 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         blobs_lons_sub[dom][np.isnan(blobs_lons_sub[dom])] = -999
 
         # get poiunt locations in terms of rows and columns OF THE SUBDOMAIN THEY APPLY TO
-        pt_locn_locs_rc[dom] = [[(np.abs(lats_mid_sub[dom][:,0]-pt_locn_locs[dom][iloc][0])).argmin(),\
-                        (np.abs(lons_mid_sub[dom][0,:]-pt_locn_locs[dom][iloc][1])).argmin()] for iloc in range(len(pt_locn_names[dom]))]
-	    # get point locations in terms of rows and columns of fixed grid array
-        pt_locn_locs_rc_fixed[dom] = [[(np.abs(blobs_lats_sub[dom][:]-pt_locn_locs[dom][iloc][0])).argmin(),\
-                        (np.abs(blobs_lons_sub[dom][:]-pt_locn_locs[dom][iloc][1])).argmin()] for iloc in range(len(pt_locn_names[dom]))]					
+        pt_locn_locs_rc[dom]=get_grid_from_ll_2d(lats_mid_sub[dom], lons_mid_sub[dom], pt_locns[dom]) #2d as variable res grid                   
+        #print("point locations",pt_locn_locs_rc[dom])
+        # get point locations in terms of rows and columns of fixed grid array GEOTIFF 
+        pt_locn_locs_rc_fixed[dom] = get_grid_from_ll(blobs_lats_sub[dom][:], blobs_lons_sub[dom][:], pt_locns[dom])#1d as constant res grid)
+              
+    #full domain point locations(non-fixed, used for archive plotting only, NOT PORTAL)
+    pt_locn_locs_rc_full= get_grid_from_ll_2d(lats_mid, lons_mid, pt_locns_full)
+   	# get point locations in terms of rows and columns of fixed grid array (NEEDED FOR PORTAL)
+    pt_locn_locs_rc_full_fixed=get_grid_from_ll(blobs_lats[:], blobs_lons[:],pt_locns_full )
 
-        # full domain
-    pt_locn_locs_rc_full += [[(np.abs(lats_mid[:,0]-pt_locn_locs_full[iloc][0])).argmin(),\
-                        (np.abs(lons_mid[0,:]-pt_locn_locs_full[iloc][1])).argmin()] for iloc in range(len(pt_locn_names_full))]
-	    # get point locations in terms of rows and columns of fixed grid array
-    pt_locn_locs_rc_full_fixed += [[(np.abs(blobs_lats[:]-pt_locn_locs_full[iloc][0])).argmin(),\
-                        (np.abs(blobs_lons[:]-pt_locn_locs_full[iloc][1])).argmin()] for iloc in range(len(pt_locn_names_full))]	
-
-
-# weights for the full domain 
-    if os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_data_ex.npz'):
+ #############################################################
+ #Weights for converting from native to uniform 5km and 3km grids
+ #############################################################
+# weights for the full domain: native -> constant res 5km
+    if os.path.exists(code_dir+'weights_data_ex.npz'):  
         print("reading npz weights")
-        weightdata = np.load('/home/stewells/AfricaNowcasting/rt_code/weights_data_ex.npz')
-        inds = weightdata['inds_ex']
-        weights= weightdata['weights_ex']
-        new_shape=tuple(weightdata['new_shape_ex'])
-                           
+        weightdata = np.load(code_dir+'weights_data_ex.npz')
+        inds = weightdata['inds_ex'] 
+        weights= weightdata['weights_ex'] #SRA removed _ex to match file creation above
+        new_shape=tuple(weightdata['new_shape_ex'])                           
     else: # need to make it   
         print("creating weights")
         inds, weights, new_shape=uinterp.interpolation_weights(lons_mid[np.isfinite(lons_mid)], lats_mid[np.isfinite(lats_mid)],blobs_lons, blobs_lats, irregular_1d=True)
-        np.savez('/home/stewells/AfricaNowcasting/rt_code/weights_data_ex.npz',inds_ex=inds,weights=weights,new_shape=np.array(new_shape))
+        np.savez(code_dir+'weights_data_ex.npz',inds_ex=inds,weights_ex=weights,new_shape_ex=np.array(new_shape))
 
-   # print(os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_2_data_ex_a.npz'))
-# return journey...
-    if os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_2_data_ex_a.npz'):
-        #print(
+# weights for the full domain: return journey...
+    if os.path.exists(code_dir+'weights_2_data_ex_a.npz'):
         print("reading npz weights 2")
-        weight2data = np.load('/home/stewells/AfricaNowcasting/rt_code/weights_2_data_ex_a.npz')
+        weight2data = np.load(code_dir+'weights_2_data_ex_a.npz')
         inds_2 = weight2data['inds_2_ex']
         weights_2= weight2data['weights_2_ex']
-        new_shape_2=tuple(weight2data['new_shape_2_ex'])
-                           
+        new_shape_2=tuple(weight2data['new_shape_2_ex'])                          
     else: # need to make it   
         print("creating weights 2")
         inds_2, weights_2, new_shape_2=uinterp.interpolation_weights(blobs_lons[np.isfinite(blobs_lons)], blobs_lats[np.isfinite(blobs_lats)], lons_mid, lats_mid)
-        np.savez('/home/stewells/AfricaNowcasting/rt_code/weights_2_data_ex_a.npz',inds_2_ex=inds_2,weights_2_ex=weights_2,new_shape_2_ex=np.array(new_shape_2))
+        np.savez(code_dir+'weights_2_data_ex_a.npz',inds_2_ex=inds_2,weights_2_ex=weights_2,new_shape_2_ex=np.array(new_shape_2))
 			
-			
-    # visual radiation only need one-way to project onto constant pixel grid
-    if os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_ssa_3km.npz'):
+# weights for the full domain vis data: native -> constant res 3km for geotiff conversion	
+    if os.path.exists(code_dir+'weights_ssa_3km.npz'):  #full grid 
         print("reading npz 3km weights")
-        weightdata3km = np.load('/home/stewells/AfricaNowcasting/rt_code/weights_ssa_3km.npz')
+        weightdata3km = np.load(code_dir+'weights_ssa_3km.npz')
         inds_3km = weightdata3km['inds_3km']
         weights_3km = weightdata3km['weights_3km']
         new_shape_3km = tuple(weightdata3km['new_shape_3km'])
     else: #nned to make it
         print("creating weights 3km")
         inds_3km, weights_3km, new_shape_3km=uinterp.interpolation_weights( lons_mid, lats_mid,blobs_lons_3km, blobs_lats_3km)
-        np.savez('/home/stewells/AfricaNowcasting/rt_code/weights_ssa_3km.npz',inds_3km=inds_3km,weights_3km=weights_3km,new_shape_3km=np.array(new_shape_3km))
+        np.savez(code_dir+'weights_ssa_3km.npz',inds_3km=inds_3km,weights_3km=weights_3km,new_shape_3km=np.array(new_shape_3km))
 
-# weights for the subdomain (only need in one direction for geotiff conversion)
+# weights for the subdomain:native -> constant res 5km for geotiff conversion	
     weightdata_sub, inds_sub, weights_sub, new_shape_sub = {},{},{},{}
-
     for dom in do_full_nowcast:
-        if os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_'+dom+'_v2.npz'):
-            weightdata_sub = np.load('/home/stewells/AfricaNowcasting/rt_code/weights_'+dom+'_v2.npz')
+        if os.path.exists(code_dir+'weights_'+dom+'_v2.npz'):
+            weightdata_sub = np.load(code_dir+'weights_'+dom+'_v2.npz')
             inds_sub[dom] = weightdata_sub['inds']
             weights_sub[dom]= weightdata_sub['weights']
             new_shape_sub[dom]=tuple(weightdata_sub['new_shape'])      
         else: # need to make it
             print("creating weights for subdomain "+dom)
             inds_sub[dom], weights_sub[dom], new_shape_sub[dom]=uinterp.interpolation_weights(lons_mid_sub[dom][np.isfinite(lons_mid_sub[dom])], lats_mid_sub[dom][np.isfinite(lats_mid_sub[dom])],blobs_lons_sub[dom], blobs_lats_sub[dom], irregular_1d=True)
-            np.savez('/home/stewells/AfricaNowcasting/rt_code/weights_'+dom+'_v2.npz',inds=inds_sub[dom],weights=weights_sub[dom],new_shape=np.array(new_shape_sub[dom]))
+            np.savez(code_dir+'weights_'+dom+'_v2.npz',inds=inds_sub[dom],weights=weights_sub[dom],new_shape=np.array(new_shape_sub[dom]))
     
-    #identify convectiv structures for real time image
-    ###inds, weights, new_shape=uinterp.interpolation_weights( lons_mid, lats_mid,blobs_lons, blobs_lats)
-    ###inds_2, weights_2, new_shape_2=uinterp.interpolation_weights(blobs_lons, blobs_lats, lons_mid, lats_mid)
-    
-
-    #print(lons_mid.shape)
-    #need to interpolate the dadta to a constant resolution 5km grid for the wavelet code
+ #############################################################
+ #Wavelet calculations: options for "new" method on native res or 
+ #                                  "old" method on constant 5km res
+ #############################################################
     data_all_keep=np.copy(data_all)
-    #print(data_all.shape)
-    blobs_interp = []
-    #print(use_times)
+    blobs_interp = []   #Actually blobs native f
     new_method=True
-    if new_method:
-        #print(use_times[:1])
+    #########################################################
+    #calculate cores
+    if new_method:  #new method calculates cores on native grid
         for i_time,date in enumerate(use_times[:1]):
-            wObj = cores.dataset('METEOSAT3K_veraLS')                                   # initialises the 3km scale decomposition and defines scale range
+            wObj = cores.dataset('METEOSAT3K_veraLS') 
+            # initialises the ~3km scale decomposition and defines scale range
             wObj.read_img(np.copy(data_all[:,:]), lons_mid, lats_mid, edge_smoothing=False)   # Prepares data image for wavelets. Input here: Native MSG data and native lat/lon coordinates (irregular 2d!)        
             wObj.applyWavelet(normed='scale')
             try:
@@ -497,60 +455,50 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
                     com_lat=nflics3k_da['max_lat']
                     com_lon=nflics3k_da['max_lon']
             except:
-                print('Date failed,', date)
-                print(np.shape(data_all))
+                print('Date failed,', date, "Data shape:",np.shape(data_all))
                 blobs_interp.append(np.zeros((1,np.shape(data_all)[0],np.shape(data_all)[1]))*np.nan)
-                #blobs_interp.append(np.zeros(np.shape(data_all[i_tim,:,:]))*np.nan)
 
         blobs_interp=np.stack(blobs_interp,axis=0)[:,0,:,:]       
         blobs_interp = blobs_interp[0]
         blobmask = np.zeros(np.shape(blobs_interp))
         blobmask[blobs_interp>0]=1
         
-    else:
-# SWAP OUT interolate -> powerblob -> interpolate back with jsut new core calc
+    else:   #Old method claulcated cores on a constant resolution 5km grid
         data_interp=uinterp.interpolate_data(data_all, inds, weights, new_shape)
         #run wavelet code
         data_blobs_date=run_powerBlobs.wavelet_analysis(np.copy(data_interp[:,:]), blobs_lons, blobs_lats, use_times[0],
                      "",data_resolution=5)
-
         com_loc=np.where(data_blobs_date["blobs"].values<0)    #power maxima of each convective structure
 
         #interpolate back onto MSG grid
         blobs_interp=uinterp.interpolate_data(data_blobs_date["blobs"].values, inds_2, weights_2, new_shape_2)
-    
-   
         blobmask_interp = np.zeros(np.shape(data_blobs_date["blobs"].values))
         blobmask_interp[data_blobs_date["blobs"].values>0]=1
 	
-    #mask the data to leave onlythe convective structures
+    #mask the data to leave only the convective structures
     usemask=np.ones(np.shape(blobs_interp))
     usemask[(blobs_interp!=0)& ~np.isnan(blobs_interp)]=0
     data_all_m=ma.masked_array(data_all,mask=usemask)
     
-        #save the data to local scratch for Chris
-        #toout=np.copy(data_all_m)
+    #########################################################
+    #save the data to local scratch for Chris and rt archive
     dimy=np.shape(ds_grid_info["lats_mid"].data)[0]
-    dimx=np.shape(ds_grid_info["lats_mid"].data)[1]
-	
+    dimx=np.shape(ds_grid_info["lats_mid"].data)[1]	
     # dimx and y for subdomains
     dimx_sub, dimy_sub = {},{}
     for dom in do_full_nowcast:
         dimy_sub[dom] = np.shape(geoloc_sub_file[dom]["lats_mid"].data)[0]
-        dimx_sub[dom] = np.shape(geoloc_sub_file[dom]["lats_mid"].data)[1]
-	
+        dimx_sub[dom] = np.shape(geoloc_sub_file[dom]["lats_mid"].data)[1]	
     #ma.set_fill_value(toout,9999)
     #NEED TO ADD BACK IN!
     scratchdir=os.path.join(scratchbase,str(dt_now.year),str(dt_now.month).zfill(2),\
                         str(dt_now.day).zfill(2),str(dt_now.hour).zfill(2)+str(dt_now.minute).zfill(2))
     rt_archive=os.path.join(archiveDir,str(dt_now.year),str(dt_now.month).zfill(2),\
                         str(dt_now.day).zfill(2),str(dt_now.hour).zfill(2)+str(dt_now.minute).zfill(2))
-
-    if not os.path.exists(scratchdir): #create plot directory if it doesn't exist
+    if not os.path.exists(scratchdir): 
         os.makedirs(scratchdir)
-    if not os.path.exists(rt_archive): #create plot directory if it doesn't exist
+    if not os.path.exists(rt_archive): 
         os.makedirs(rt_archive)    
-
     ds=xr.Dataset()
     ds['cores']=xr.DataArray(data_all_m[:], coords={'ys_mid': range(dimy) , 'xs_mid': range(dimx)},dims=['ys_mid', 'xs_mid']) 
     ds.attrs['time']=tnow
@@ -566,21 +514,18 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
                  mode='w', encoding=enc, format='NETCDF4')
     ds.to_netcdf(path=rt_archive+"/Convective_struct_extended_"+tnow+"_000.nc",\
                  mode='w', encoding=enc, format='NETCDF4')
-    # output the geotiffs for the portal
-    if do_geotiff:
-        # 1. Cloud top temperature
-# interpolate to 5km here
-       # plt.imshow(data_all_keep)
-       # plt.show()
-        
+    
+    #########################################################
+    # output the geotiffs for the portal: 1. CTT, 2. vis, 3. CORES
+    if do_geotiff:   
+        #1. CTT
         #rasPath = geotiff_outpath+"/Observed_CTT_"+tnow+"_extended.tif"
-        rasPath = get_portal_outpath('CTT',tnow)+"/Observed_CTT_"+tnow+"_extended.tif"
-
+        rasPath = get_portal_outpath('CTT',tnow,lawisDirs)+"/Observed_CTT_"+tnow+"_extended.tif"
 
         #rasPath_3857 = geotiff_outpath+"/Observed_CTT_"+tnow+"_extended_3857.tif"
-        rasPath_3857 = get_portal_outpath('CTT',tnow)+"/Observed_CTT_"+tnow+"_extended_3857.tif"
+        rasPath_3857 = get_portal_outpath('CTT',tnow,lawisDirs)+"/Observed_CTT_"+tnow+"_extended_3857.tif"
 
-        data_interp = uinterp.interpolate_data(data_all_keep, inds, weights, new_shape) # interpolate onto constant grid for geotiff
+        data_interp = uinterp.interpolate_data(data_all_keep, inds, weights, new_shape) # interpolate onto constant 5km grid for geotiff
 
         if  opt_geotiff:                  
             if opt_geotiff_float32:
@@ -588,22 +533,16 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
             if opt_geotiff_ndpls >=0:
                 data_interp = np.round(data_interp,opt_geotiff_ndpls)
 
-
-
         make_geoTiff([data_interp],rasPath,reprojFile=rasPath_3857,extended=True,v_maj=version_maj['full'],v_min=version_min['full'],v_submin=version_submin['full'],trim=True,rm_distort=True)
-        #os.system('rm '+rasPath)
         # 2. visible channel
-        if not np.isnan(data_all_vis).all():
-            
+        if not np.isnan(data_all_vis).all():          
             #rasPath= geotiff_outpath+"/ch1_X_"+tnow+"_pc.tif"
             #rasPath_3857= geotiff_outpath+"/ch1_X_"+tnow+"_pc_3857.tif"
-            rasPath= get_portal_outpath('Vis',tnow)+"/ch1_X_"+tnow+"_pc.tif"
-            rasPath_3857= get_portal_outpath('Vis',tnow)+"/ch1_X_"+tnow+"_pc_3857.tif"
+            rasPath= get_portal_outpath('Vis',tnow,lawisDirs)+"/ch1_X_"+tnow+"_pc.tif"
+            rasPath_3857= get_portal_outpath('Vis',tnow,lawisDirs)+"/ch1_X_"+tnow+"_pc_3857.tif"
 
             data_interp_vis=uinterp.interpolate_data(data_all_vis, inds_3km, weights_3km, new_shape_3km)
-# getting some weird neagitves here so crop them
-            data_interp_vis[data_interp_vis<0] = np.nan
-
+            data_interp_vis[data_interp_vis<0] = np.nan  # getting some weird neagitves here so crop them
             xx= data_interp_vis.astype(float)
             xx_shifted = xx -np.nanmin(xx)
             yy= xx_shifted*100/max(np.nanmax(xx_shifted),0.000001)
@@ -618,23 +557,19 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         # 3. Convective structures
         #rasPath = geotiff_outpath+"/Observed_ConStruct_"+tnow+"_extended.tif"
         #rasPath_3857 = geotiff_outpath+"/Observed_ConStruct_"+tnow+"_extended_3857.tif"
-        rasPath = get_portal_outpath('ConStruct',tnow)+"/Observed_ConStruct_"+tnow+"_extended.tif"
-        rasPath_3857 = get_portal_outpath('ConStruct',tnow)+"/Observed_ConStruct_"+tnow+"_extended_3857.tif"
-# interpolate to 5km here
-        blobmask_interp = uinterp.interpolate_data(blobmask, inds, weights, new_shape) 
-	
-        if output_site_cores:
-    # ASSUMES NEW METHOD WITH BLOBS ON NATIVE GRID
+        rasPath = get_portal_outpath('ConStruct',tnow,lawisDirs)+"/Observed_ConStruct_"+tnow+"_extended.tif"
+        rasPath_3857 = get_portal_outpath('ConStruct',tnow,lawisDirs)+"/Observed_ConStruct_"+tnow+"_extended_3857.tif"
+        blobmask_interp = uinterp.interpolate_data(blobmask, inds, weights, new_shape) # interpolate to 5km here
+
+        if output_site_cores: # ASSUMES NEW METHOD WITH BLOBS ON NATIVE GRID
             isblobList = []
-            for iloc in range(len(pt_locn_names_full)):
+            for iloc in range(len(pt_locns_full.keys())):
                 isblobList+=[np.ceil(blobmask_interp[pt_locn_locs_rc_full_fixed[iloc][0],pt_locn_locs_rc_full_fixed[iloc][1]])]
             site_core_csv = plotdir+"/Site_cores_"+tnow+".csv"
-            write_site_cores(site_core_csv,pt_locn_names_full,pt_locn_locs_full,isblobList)
+            write_site_cores(site_core_csv,pt_locns_full.keys(),pt_locns_full,isblobList)
               
         sx = ndimage.sobel(blobmask_interp, axis=0, mode='constant')
         sy = ndimage.sobel(blobmask_interp, axis=1, mode='constant')
-        #sx = ndimage.sobel(blobmask, axis=0, mode='constant')
-        #sy = ndimage.sobel(blobmask, axis=1, mode='constant')
         sob = np.hypot(sx, sy)
         sob_filter = 2  # original was 2
         sob[sob<=sob_filter] = 0
@@ -650,12 +585,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         for core_time in list(use_core_times):        
             scratchdir_cs=os.path.join(scratchRoot,'nflics_current',str(core_time.year),str(core_time.month).zfill(2),\
                        str(core_time.day).zfill(2),str(core_time.hour).zfill(2)+str(core_time.minute).zfill(2))
-            #print(scratchdir_cs)
+
             scratchfile=scratchdir_cs+"/Convective_struct_extended_"+str(core_time).replace("-"," ").replace(":","").replace(" ","")[:-2]+"_000.nc"
-            #print(scratchfile)
-            #print(scratchfile)
-
-
             if os.path.exists(scratchfile):      
                 #print("FOUND")         
                 try:
@@ -672,7 +603,6 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
                 past_times.append(np.nan)   
     
         past_cores=np.array(past_cores)
-
         past_cores[np.where(past_cores<0)]=1
         past_cores[np.where(np.isnan(past_cores))]=0
         
@@ -694,34 +624,28 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         #get_portal_outpath('ConStruct',tnow)
         #rasPath = geotiff_outpath+"/PastCores_"+tnow+".tif"
         #rasPath_3857 = geotiff_outpath+"/PastCores_"+tnow+"_3857.tif"
-        rasPath = get_portal_outpath('PastCores',tnow)+"/PastCores_"+tnow+".tif"
-        rasPath_3857 = get_portal_outpath('PastCores',tnow)+"/PastCores_"+tnow+"_3857.tif"
-        #print("PASTCORES")
-        #print(rasPath_3857)
+        rasPath = get_portal_outpath('PastCores',tnow,lawisDirs)+"/PastCores_"+tnow+".tif"
+        rasPath_3857 = get_portal_outpath('PastCores',tnow,lawisDirs)+"/PastCores_"+tnow+"_3857.tif"
         make_geoTiff([allPastCores],rasPath,reprojFile=rasPath_3857,extended=True,v_maj=version_maj['full'],v_min=version_min['full'],v_submin=version_submin['full'],trim=True)    
         os.system('rm '+rasPath)   
 
 
     print(''.join(["NFLICS core time: ",str((time.time()-processClock))]))      
-   
-    
 
 
-
-
-
-
-
-
-    if do_extended_core_calcs:
+    if do_extended_core_calcs:  #Extended core calculations. Were done in parallel
         pext= extendedCoreCalc(ds_grid_info_ex,data_all_ex,rt_lats_ex,rt_lons_ex,plot_area_ex,use_times,tnow,scratchdir,do_geotiff,geotiff_outpath,data_all_vis,ds_grid_info_ex_3km)
         pext.start()
 
     #-------------------------------------------------------------------------------
     # Calculate the commune core coverage and update daily and seasonal files (if needed)
+    # This is used for the flood risk, but needs to be here in the nowcast code where cores
+    # are created.
     #-------------------------------------------------------------------------------
-    #load in the commune_grid information
-    ds_dakar=xr.open_dataset("/mnt/prj/nflics/geoloc_grids/dakar_grid_v2.nc")
+    
+    #########################################################
+    ##get the current cores at each Dakar commune
+    ds_dakar_2=xr.open_dataset("dakar_grid_v4.nc")
 
     #load in "Anticedent_conditions.csv to give weighting function, WET, DRY
     ant_cond=pd.read_csv("/mnt/prj/nflics/RT_code_v2_input/Antecedent_conditions.csv",index_col=0).transpose().to_dict(orient="list")
@@ -729,7 +653,6 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     #load in distributions relating rg_hist to cores
     ds_rg_hist=xr.open_dataset("/mnt/prj/nflics/RT_code_v2_input/dakar_rain_hazard_v2.nc")
 
-    
     if dt_now.month<6:
         month_assoc=ds_rg_hist["months_assoc"].data[np.where(ds_rg_hist.coords["months"]==6)[0][0]].decode() 
     elif dt_now.month>9:
@@ -741,22 +664,25 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     cores_commune=[]
     #if there are no cores then don't bother looping
     if np.nanmin(usemask)==1:
-        cores_commune=[0]*len(ds_dakar.coords["communes"])
+        cores_commune=[0]*len(ds_dakar_2.coords["communes"])
     else:
-        for i_commune,commune in enumerate(ds_dakar.coords["communes"]):
-            msg_pts=ds_dakar["commune_msg_pt"][np.where(ds_dakar.coords["communes"]==commune)]
-            msg_x=[int(s.split(",")[0]) for s in msg_pts.data[0].decode().split("_")]
-            msg_y=[int(s.split(",")[1]) for s in msg_pts.data[0].decode().split("_")]
-            # shift for Dakar on WA
-            #msg_x = [x+55 for x in msg_x]
-            #msg_y = [y+144 for y in msg_y]
-            # shift for Dakar on full MSG
-            msg_x = [x+11 for x in msg_x]
-            msg_y = [y+1508 for y in msg_y]
+        for i_commune,commune in enumerate(ds_dakar_2["commune_ind"].data):
+            #print(i_commune,commune)
+            msg_info=ds_dakar_2[str(commune).zfill(2)+"_msg"]
+            
+            #SRA new version uses lat and lon and calculates msg_x and msg_y
+            msg_lon=msg_info[np.where(ds_dakar_2.coords["info"]=="lon")].data[0].tolist()
+            msg_lat=msg_info[np.where(ds_dakar_2.coords["info"]=="lat")].data[0].tolist()
+      
+            locs=list(zip(msg_lat, msg_lon)) #SRA needs to be sepearte variable (no idea why)
+            msg_loc=get_grid_from_ll_2d(lats_edge,lons_edge,locs)            
+            msg_y=[int(a[0]) for a in msg_loc]
+            msg_x=[int(a[1]) for a in msg_loc]
+            
             cores_commune.append(np.amax((~data_all_m[msg_y,msg_x].mask).astype(int)))
-            #cores_commune.append(np.amin(use_mask[msg_y,msg_x]))
-    ############
-    #Processing of daily data
+
+    #########################################################
+    #Calculating/updating the daily core file
 
     #load in file dependent on time where a new NFLICS day startes (defined in ant_cond["Day_start"])
     if int(tnow[-4:])<int(ant_cond["Day_start"][0]): 
@@ -773,17 +699,17 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         os.system("cp /mnt/prj/nflics/RT_code_v2_input/Day_cores_YYYYMMDD.csv "+daily_file)
 
     #read -> update -> save
-    daily_cores=pd.read_csv(daily_file)             #read in daily cores file
-    daily_cores[tnow[-4:]]=cores_commune            #fill in this time
-    daily_cores.to_csv(daily_file,index=False)      #save the updated core file
+    daily_cores=pd.read_csv(daily_file)             #read: read in daily cores file
+    daily_cores[tnow[-4:]]=cores_commune            #update: fill in this time
+    daily_cores.to_csv(daily_file,index=False)      #save: updated core file
 
     #format for use later in the code
     daily_cores_arr=np.array(daily_cores)[:,2:] #remove the CCRCA and Geolocation index columns
     daily_cores_arr[daily_cores_arr<0]=np.nan
     daily_cores_sites=np.array(daily_cores["Geolocation index"])
 
-    ############
-    #Processing of season data
+    #############################################
+    #Calculating/updating the season core file
 
     #load in season file
     season_file=os.path.join("/",*plotdir.split("/")[:-3],"Season_cores_total_"+daily_dir.split("/")[-3]+".csv")   #number of cores per day
@@ -841,11 +767,14 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     if len(do_full_nowcast)>0: # any subdomains to make nowcasts for
         #format for use later in the code
         #cores to use for anticedent condition upto and NOT INCLUDING today.            
+        """
+        MOVED TO flood_risk.py SRA Jun 2026
         anti_cores=np.array(season_cores_anti)[:,2:(day_in_season.days+1)] #remove CCRCA and Geolocation columns, then read from 1 to day_in_season-1
         anti_cores[np.where(anti_cores==-999)]=np.nan
 
         today_cores=np.nansum(daily_cores_arr,axis=1)
-        today_cores[np.where(today_cores>=core_cutoff)]=core_cutoff-1
+        today_cores[np.where(today_cores>=core_cutoff)]=core_cutoff-1#
+        """
         #-------------------------------------------------------------------------------
         # plot the cores up to time now and LST data if it exists
         #-------------------------------------------------------------------------------
@@ -857,7 +786,6 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
                             str(core_time.day).zfill(2),str(core_time.hour).zfill(2)+str(core_time.minute).zfill(2))
 
             scratchfile=scratchdir+"/Convective_struct_extended_"+str(core_time).replace("-"," ").replace(":","").replace(" ","")[:-2]+"_000.nc"
-            #print(scratchfile)
             if os.path.exists(scratchfile):
                 try:
                     core_ds=xr.open_dataset(scratchfile)   
@@ -919,20 +847,12 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 
         if not os.path.exists(plotdir): #create plot directory if it doesn't exist
             os.makedirs(plotdir)
-        
 
-       
-         
         if do_shared_plots:
             plotfile=plotdir+"/LSTA_past_cores_"+tnow+"_000.png"  #DO NOT CHANGE - HARD CODED IN GUI
             
             if ~np.isnan(np.nanmax(dat_lst)):
-               # plot_slice_lst(dat_lst,lst_geoloc["WA_lat"].data,lst_geoloc["WA_lon"].data,past_cores,lats_edge,lons_edge,\
-               #         lats_mid,lons_mid,plotfile,'l',[8,-18,20,0],-10,\
-               #            r'{}'.format(str(use_times[0])[:-9]+"\n "+tnow[-4:]+"UTC \n \n T anom. ($^\circ$C)"),cmap="PuOr_r",\
-               #          	cell_col="cyan",use_vmin=-12,use_vmax=12,use_extend="both",\
-               #             use_title="LST av. anom. ("+lst_time_lab+") from climatology  \n & identified convective structures")
-                            
+                              
                 plot_slice_lst(dat_lst,lst_geoloc["WA_lat"].data,lst_geoloc["WA_lon"].data,past_cores,lats_edge,lons_edge,\
                         lats_mid,lons_mid,plotfile,'l',plot_area,-10,\
                            r'{}'.format(str(use_times[0])[:-9]+"\n "+tnow[-4:]+"UTC \n \n T anom. ($^\circ$C)"),cmap="PuOr_r",\
@@ -957,31 +877,16 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 
         def nowcast_subdomain(domain):	
            # FUNCTION TO DO NOWCASTS (AND POSSIBLY RISK IF APPROPRIATE)
-            #print("Processing nowcasts for "+domain)
-
 
             # initial step - plot convective structures over domain
             plotfile=plotdir+"/Convective_struct_"+tnow+"_000"+dom_suffix[domain]+".png"  #DO NOT CHANGE - HARD CODED IN GUI
-
-            #plot_slice_cells_blobs(data_all_keep,data_all_m.mask[...],lats_edge,lons_edge,lats_mid,lons_mid,\
-            #              plotfile,'l',[8,-18,20,0],-10,\
-            #               r'{}'.format(str(use_times[0])[:-9]+"\n "+tnow[-4:]+"UTC \n \n T ($\circ$C)"),cmap="hot",\
-            #             	cell_col="cyan",use_vmin=-80,use_vmax=-10,use_extend="min",\
-            #                use_title="Observed cloud top temperature \n & identified convective structures")
-
-          #  plot_slice_cells_blobs(data_all_keep,data_all_m.mask[...],lst_geoloc["WA_lat"].data,lst_geoloc["WA_lon"].data,lats_mid,lons_mid,\
-          #                plotfile,'l',plot_area_sub[domain],-10,\
-          #                 r'{}'.format(str(use_times[0])[:-9]+"\n "+tnow[-4:]+"UTC \n \n T ($\circ$C)"),cmap="hot",\
-          #               	cell_col="cyan",use_vmin=-80,use_vmax=-10,use_extend="min",\
-          #                  use_title="Observed cloud top temperature \n & identified convective structures")
                             
             plot_slice_cells_blobs(data_all_keep,data_all_m.mask[...],lats_edge,lons_edge,lats_mid,lons_mid,\
                           plotfile,'l',plot_area_sub[domain],-10,\
                            r'{}'.format(str(use_times[0])[:-9]+"\n "+tnow[-4:]+"UTC \n \n T ($\circ$C)"),cmap="hot",\
                          	cell_col="cyan",use_vmin=-80,use_vmax=-10,use_extend="min",\
                             use_title="Observed cloud top temperature \n & identified convective structures")				
-							
-
+						
             plt.close()
 
 
@@ -1007,24 +912,13 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
             com_loc=((np.zeros((np.shape(com_lat.data))).astype(int),np.zeros((np.shape(com_lon.data))).astype(int)) )
 
             i=0
-            #print(domain)
-            #print(plot_area_sub[domain])
-            #print(com_lat.data)
-            #print(com_lon.data)
             for lat_loc,lon_loc in zip(com_lat.data,com_lon.data):        
-            #print(i,lat_loc,lon_loc)
                 if ((lat_loc not in lats_mid_sub[domain]) or (lon_loc not in lons_mid_sub[domain])):
                 #if ((lat_loc < plot_area_sub[domain][0]) or (lat_loc > plot_area_sub[domain][2]) or (lon_loc <  plot_area_sub[domain][1]) or (lon_loc > plot_area_sub[domain][3])):
+                    print("location outside of subdomain ", domain)
                     continue
-                #print([lon_loc,lat_loc])
-                #print(np.where((lats_mid_sub[domain]==lat_loc) & (lons_mid_sub[domain]==lon_loc))[1])
-                #print(np.where(lats_mid_sub[domain]==lat_loc))
-                #print(np.where(lons_mid_sub[domain]==lon_loc))	
-                #print([np.nanmax(lons_mid_sub[domain])])			
-            # lats_mid etc need to be the SUBDOMAIN ONES
-
-                com_loc[1][i,]=np.where((lats_mid_sub[domain]==lat_loc) & (lons_mid_sub[domain]==lon_loc))[1]
-                com_loc[0][i,]=np.where((lats_mid_sub[domain]==lat_loc) & (lons_mid_sub[domain]==lon_loc))[0]
+                com_loc[1][i,]=np.where((lats_mid_sub[domain]==lat_loc) & (lons_mid_sub[domain]==lon_loc))[1][0]  #SRA 042026 added[0] to get it to run
+                com_loc[0][i,]=np.where((lats_mid_sub[domain]==lat_loc) & (lons_mid_sub[domain]==lon_loc))[0][0]
                 i=i+1
         
 		    # (re)definition of com_loc for the specific domain 
@@ -1084,8 +978,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
             
                 dat_rect_t=[]
                 dat_poly_t=[]
-                dat_rect_pt_ts = [[] for x in range(len(pt_locn_names[domain]))] # 6 locations 
-                dat_rect_fixed_pt_ts = [[] for x in range(len(pt_locn_names[domain]))] # 6 locations on fixed pixel grid
+                dat_rect_pt_ts = [[] for x in range(len(pt_locns[domain].keys()))] # 6 locations 
+                dat_rect_fixed_pt_ts = [[] for x in range(len(pt_locns[domain].keys()))] # 6 locations on fixed pixel grid
                 pt_ts_filters = []
                 dat_rect_max_comb =[]
                 #print([use_times,t_searches])		
@@ -1136,54 +1030,7 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         #mask based on number of points        
                     mask=rt_mask_nowcast(mask_dir[domain],dt_now,lastDay,i_search)
                     dat_rect_max[np.where(mask==1)]=-998.0
-                    """
-					BEEN PUT INTO A FUNCTION RECT_RT_LOOP
-                    for i_rect,rect in enumerate(use_rect):
-                        timeStampStart= time.time()		  		    
-                        loaddir=datadir[domain]+rect+"_"+str(nadd)+"/Data_clim_freq_rectrect_"+rect+"_"+str(nadd)+"_search_"+str(i_search)+"_"+\
-                           "refhours_"+load_time+"00_"+load_time+"00.nc"
-                        #print([os.path.exists(loaddir),loaddir])
-                        if os.path.exists(loaddir):
-                            ds=xr.open_dataset(loaddir)
-                            
-                            if ds.attrs["ngrids"]>=20:
-														
-                                flt_ind=np.where(ds.flt.data==filters_real_time[domain][int(i_search/60)])[0][0]
-                                dat_rect.append(ds["freq"].data[flt_ind,:,:]) 
-                                
-                                if do_risk_subdomain[domain]:
-                                    if(i_rect)==0:  
-                                        poly_val_freq=ds.attrs["poly_val_freq"]
-                                    else:
-                                        poly_val_freq=np.maximum(poly_val_freq,ds.attrs["poly_val_freq"])
-                            else:  
-                                missing_database_vec_t.append(loaddir.split("/")[-1])
-                                fill_missing_ds=np.zeros(np.shape(lats_mid_sub[domain]))-999
-                                dat_rect.append(fill_missing_ds)
-                                if do_risk_subdomain[domain]:
-                                    if(i_rect)==0:
-                                        poly_val_freq=-999
-                                    else:
-                                        poly_val_freq=poly_val_freq
-                            ds.close()
-                        else:
-                            missing_database_vec_t.append(loaddir.split("/")[-1])
-                            fill_missing_ds=np.zeros(np.shape(lats_mid_sub[domain]))-999
-                            dat_rect.append(fill_missing_ds)
-                            if do_risk_subdomain[domain]:							
-                                if(i_rect)==0:
-                        	        poly_val_freq=-999
-                                else:
-                        	        poly_val_freq=poly_val_freq 
-                   # print(''.join(["time: ",str((time.time()-timeStampStart))]))   
-                #combine grids for this time taking the maximum over the different source locations selected
-                    dat_rect=np.stack(dat_rect,axis=0)
-
-                    dat_rect_max = np.nanmax(dat_rect,axis=0)
-                    """
-					
-					
-
+			
                  # only apply after 11AM
                     if dt_now.hour>=11 and do_lst_adjustments[domain] and valid_lsta: 
                         print("Applying LST adjustments")
@@ -1238,8 +1085,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
                 #dat_rect[0,:,:][dat_rect[0,:,:]>100] = 100.    
                     # END OF LSTA IF
                     dat_rect_max[:,:][dat_rect_max[:,:]>100] = 100.    
-                    for iloc in range(len(pt_locn_names[domain])):
-                        dat_rect_pt_ts[iloc].append(dat_rect_max[pt_locn_locs_rc[domain][iloc][0],pt_locn_locs_rc[domain][iloc][1]])
+                    for iloc,loc in enumerate(pt_locns[domain].keys()):
+                        dat_rect_pt_ts[iloc].append(dat_rect_max[pt_locn_locs_rc[domain][loc][0],pt_locn_locs_rc[domain][loc][1]])
                     pt_ts_filters.append((filters_real_time[domain][int(i_search/60)]*5/(2*3))-1) 
                     dat_rect_max_comb.append(dat_rect_max)
                     #plot the probability grids
@@ -1248,16 +1095,14 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 				
                     if do_geotiff:
                         # make a constant 5km pixel version of the probability grids
-                        #print(dat_rect_max.shape)
-
                         dat_rect_geotiff_interp=uinterp.interpolate_data(dat_rect_max, inds_sub[domain], weights_sub[domain], new_shape_sub[domain])
                         dat_rect_geotiff_interp_grid =dat_rect_geotiff_interp[:] 
 
                         #rasPath = geotiff_outpath+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+dom_suffix[domain]+".tif"
                         #rasPath_3857 = geotiff_outpath+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+"_3857"+dom_suffix[domain]+".tif"
-                        rasPath = get_portal_outpath('Nowcast',tnow)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+dom_suffix[domain]+".tif"
-                        rasPath_3857 = get_portal_outpath('Nowcast',tnow)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+"_3857"+dom_suffix[domain]+".tif"
-
+                        rasPath = get_portal_outpath('Nowcast',tnow,lawisDirs)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+dom_suffix[domain]+".tif"
+                        rasPath_3857 = get_portal_outpath('Nowcast',tnow,lawisDirs)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+"_3857"+dom_suffix[domain]+".tif"
+                        #print("rasPaths:",rasPath, rasPath_3857)
 
                         if  opt_geotiff:                  
                             if opt_geotiff_float32:
@@ -1266,15 +1111,44 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
                                 dat_rect_geotiff_interp_grid = np.round(dat_rect_geotiff_interp_grid,opt_geotiff_ndpls)
 
 
-
+                        print("making nowcast geotiff")
                         make_geoTiff([dat_rect_geotiff_interp_grid],rasPath,reprojFile=rasPath_3857,doReproj=False,is_nowcast=True,subdomain=domain,v_maj=version_maj[domain],v_min=version_min[domain],v_submin=version_submin[domain])
-                        if do_point_timeseries and len(pt_locn_names[domain])>0:
-                            for iloc in range(len(pt_locn_names[domain])):
+                        if do_point_timeseries and len(pt_locns[domain].keys())>0:
+                            for iloc in range(len(pt_locns[domain].keys())):
                                 dat_rect_fixed_pt_ts[iloc].append(dat_rect_geotiff_interp_grid[pt_locn_locs_rc_fixed[domain][iloc][0],pt_locn_locs_rc_fixed[domain][iloc][1]])
                             pointplot_tsfile='' # dont need for geotiff/portal
 							
+                        if options["extract_riskpt"] and dom=="wa":
+                            print("extracting the flood risk points from the nowcast")
+                            #extract and save the points needed for flood risk
+                            nflics_pt=[]
+                            print("dom:",dom)
+                            for i_commune,commune in enumerate(ds_dakar_2["commune_ind"].data):
+                                #print(i_commune,commune)
+                                msg_info=ds_dakar_2[str(commune).zfill(2)+"_msg"]
+                                
+                                #SRA new version uses lat and lon and calculates msg_x and msg_y
+                                msg_lon=msg_info[np.where(ds_dakar_2.coords["info"]=="lon")].data[0].tolist()
+                                msg_lat=msg_info[np.where(ds_dakar_2.coords["info"]=="lat")].data[0].tolist()
                           
-                    
+                                locs=list(zip(msg_lat, msg_lon)) #SRA needs to be sepearte variable (no idea why)
+                           
+                                msg_loc=get_grid_from_ll_2d(lats_edge_sub[dom],lons_edge_sub[dom],locs)            
+                                msg_loc=get_grid_from_ll_2d(lats_edge_sub[dom],lons_edge_sub[dom],locs)            
+                                msg_y=[int(a[0]) for a in msg_loc]
+                                msg_x=[int(a[1]) for a in msg_loc]
+                                
+                                nflics_pt.append(np.amax(dat_rect_max[msg_y,msg_x])) #max probability over commune
+                            
+                            nflics_ptPath = get_portal_outpath('Risk',tnow,lawisDirs)+"/Nowcast_risk/"
+                            if not os.path.exists(nflics_ptPath):
+                                os.makedirs(nflics_ptPath)
+                                
+                            nflics_pt_df = pd.DataFrame(nflics_pt,
+                                                index=[ds_dakar_2.coords["communes"].data],
+                                                columns=[str(i_search).zfill(3)])                                               
+                            nflics_pt_df.to_csv(nflics_ptPath+"nflics_nowcast_pt_"+tnow+"_"+str(i_search).zfill(3)+dom_suffix[domain]+".csv",index=True)      #save: updated core file
+
 
                 		#os.system('cp '+pointplot_csvfile+' '+geotiff_outpath)
 					
@@ -1307,14 +1181,6 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
                 pointplot_tsfile=plotdir+"/Nowcast_timeseries_v"+str(nflics_output_version[domain])+"_"+tnow+dom_suffix[domain]+".png"
                 pointplot_csvfile=plotdir+"/Nowcast_timeseries_v"+str(nflics_output_version[domain])+"_"+tnow+dom_suffix[domain]+".csv"
             
-                
-			
-           # if do_geotiff:
-           #     rasPath = geotiff_outpath+"/Nowcast_"+tnow+".tif"
-           #     rasPath_3857 = geotiff_outpath+"/Nowcast_"+tnow+"_3857.tif"
-           #     make_geoTiff(dat_rect_max_comb,rasPath,reprojFile=rasPath_3857)
-
-
 			    # output as netcdf
                 dat_rect_max_comb = np.stack(dat_rect_max_comb,axis=0)
                 ds_nc=xr.Dataset()
@@ -1329,38 +1195,44 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
                 enc = {var: comp for var in ds_nc.data_vars}
                 ds_nc.to_netcdf(path=plotdir+"/Nowcast_"+tnow+"_000"+dom_suffix[domain]+".nc",mode='w', encoding=enc, format='NETCDF4')
 			
-
-                if do_geotiff and do_point_timeseries and len(pt_locn_names[domain])>0:
+               
+            
+            
+            
+            
+            
+                if do_geotiff and do_point_timeseries and len(pt_locns[domain].keys())>0:
                     writeType='w' if first_pt_ts[1] else 'a'
 
-                   # pointplot_csvfile_fixed_grid=geotiff_outpath+"/Nowcast_timeseries_v"+str(nflics_output_version_portal)+"_"+tnow+".csv"
-                    pointplot_csvfile_fixed_grid=get_portal_outpath('Nowcast_ts',tnow)+"/Nowcast_timeseries_v"+str(nflics_output_version_portal)+"_"+tnow+".csv"
+                    pointplot_csvfile_fixed_grid=get_portal_outpath('Nowcast_ts',tnow,lawisDirs)+"/Nowcast_timeseries_v"+str(options["nflics_output_version_portal"])+"_"+tnow+".csv"
 
-                    plt_nflics_ts(str(use_times[0])[:-9]+' '+tnow[-4:]+" UTC",dat_rect_fixed_pt_ts,pt_locn_names[domain],pt_locn_locs[domain],pointplot_tsfile,pointplot_csvfile_fixed_grid,pt_ts_filters,nhrs=9,fixed=True)
+                    plt_nflics_ts(str(use_times[0])[:-9]+' '+tnow[-4:]+" UTC",dat_rect_fixed_pt_ts,pt_locns[domain].keys(),pt_locns[domain],pointplot_tsfile,pointplot_csvfile_fixed_grid,pt_ts_filters,nhrs=9,fixed=True)
                     first_pt_ts[1] = False
 			
-                if do_point_timeseries and len(pt_locn_names[domain])>0:
-                    writeType='w' if first_pt_ts[0] else 'a'
-                    #plt_nflics_ts(str(use_times[0])[:-9]+' '+tnow[-4:]+" UTC",dat_rect_pt_ts,pt_locn_names,pt_locn_locs,pointplot_tsfile,pointplot_csvfile,pt_ts_filters)
-                    plt_nflics_ts(str(use_times[0])[:-9]+' '+tnow[-4:]+" UTC",dat_rect_fixed_pt_ts,pt_locn_names[domain],pt_locn_locs[domain],pointplot_tsfile,pointplot_csvfile,pt_ts_filters,nhrs=9)
-                    first_pt_ts[0] = False
+                #SRA commented this out as the timeseries DON'T WORK unless do_geotiff is set
+              #  if do_point_timeseries and len(pt_locn_names[domain])>0:
+              #      writeType='w' if first_pt_ts[0] else 'a'
+              #      #plt_nflics_ts(str(use_times[0])[:-9]+' '+tnow[-4:]+" UTC",dat_rect_pt_ts,pt_locn_names,pt_locn_locs,pointplot_tsfile,pointplot_csvfile,pt_ts_filters)
+              #      plt_nflics_ts(str(use_times[0])[:-9]+' '+tnow[-4:]+" UTC",dat_rect_fixed_pt_ts,pt_locn_names[domain],pt_locns_locs[domain],pointplot_tsfile,pointplot_csvfile,pt_ts_filters,nhrs=9)
+              #      first_pt_ts[0] = False
             #if do_geotiff:
             #    os.system('cp '+pointplot_csvfile+' '+geotiff_outpath)
             #-------------------------------------------------------------------------------
             #write out file of polygon values into csv file
+            #SRA REMOVED 29/04/2026 as flood risks now using grid values
             #-------------------------------------------------------------------------------
-                if do_risk_subdomain[domain]:
-                    dat_poly=np.stack(dat_poly_t,axis=0)
+               # if do_risk_subdomain[domain]:
+               #     dat_poly=np.stack(dat_poly_t,axis=0)
      
-                    outcsv=plotdir+"/Nowcast_v"+str(nflics_output_version[domain])+"_"+tnow+"_polygons.csv"
-                    with open(outcsv, 'w') as f:
-                        writer=csv.writer(f)
-                        to_out=["Admin. Boundary".encode("utf-8")]+t_searches
-                        writer.writerow(to_out)
-                        for poly in ds.attrs["poly_ind_freq"]:
-                            poly_name=poly_names[np.where(poly_vals==poly)]
-                            ncst=dat_poly[:,np.where(ds.attrs["poly_ind_freq"]==poly)[0][0]]
-                            writer.writerow([str(poly_name[0]).encode("utf-8")]+list(ncst))
+               #     outcsv=plotdir+"/Nowcast_v"+str(nflics_output_version[domain])+"_"+tnow+"_polygons.csv"
+               #     with open(outcsv, 'w') as f:
+                #        writer=csv.writer(f)
+                #        to_out=["Admin. Boundary".encode("utf-8")]+t_searches
+                #        writer.writerow(to_out)
+                #        for poly in ds.attrs["poly_ind_freq"]:
+                #            poly_name=poly_names[np.where(poly_vals==poly)]
+                #            ncst=dat_poly[:,np.where(ds.attrs["poly_ind_freq"]==poly)[0][0]]
+               #             writer.writerow([str(poly_name[0]).encode("utf-8")]+list(ncst))
 
             #print(dat_poly)
                 n_missing=[len(x) for x in missing_database_vec]
@@ -1382,183 +1254,20 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
                 try:
                     dummy_arr = np.ones((2,2))*-9999
                     for use_time,i_search in zip(use_times,t_searches):  
-                        rasPath = get_portal_outpath('Nowcast',tnow)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+dom_suffix[domain]+".tif"
-                        rasPath_3857 = get_portal_outpath('Nowcast',tnow)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+"_3857"+dom_suffix[domain]+".tif"
+                        rasPath = get_portal_outpath('Nowcast',tnow,lawisDirs)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+dom_suffix[domain]+".tif"
+                        rasPath_3857 = get_portal_outpath('Nowcast',tnow,lawisDirs)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+"_3857"+dom_suffix[domain]+".tif"
                         make_geoTiff([dummy_arr],rasPath,reprojFile=rasPath_3857,doReproj=False,is_nowcast=True,subdomain=domain,v_maj=version_maj[domain],v_min=version_min[domain],v_submin=version_submin[domain])
                 except Exception as e:
                     print(e)  
 
 
                 pass
-            print(['DO RISK',do_risk])
-            if do_risk==1 and do_risk_subdomain[domain]:   
-                #-------------------------------------------------------------------------------
-                #flood risk calculations
-                #-------------------------------------------------------------------------------
-                #first calculate the flood hazard informaion (risk matrix column)
-                #convective core hazard from polygon values at specified region polygon
-                #load in Haxard_mapping.csv
-                #prob(rain|core) per commune in Hazard_mapping.csv
-                #   1.todays cores from day file already loaded in "today_cores" 
-                #   2.read in distribution file -> select distibution to use based on todays cores
-                #   3.anticedent conditions (three options - a using cores, b WET, c DRY)
-                #       a) use information from season file and weighting function (Andicedent_conditions.csv) to estimate
-                #       b) use "WET" value
-                #       c) use "DRY" value
-                # for each anticedent condition
-                #   4.use distribution to map Thresh (from Anticedent_conditions.csv)-anticedent amount to probability per commune
-                #   5.map to risk matrix row
-            
-                hazard_mapping=pd.read_csv(rt_code_input+"/Hazard_mapping.csv").to_dict(orient="list")
-                vul_mapping=pd.read_csv(rt_code_input+"/Vulnerability.csv").to_dict(orient="list")
-                m,n=[int(ant_w) for ant_w in ant_cond["Weighting"][0].split("_")]
-                anti_vec=np.array(1/np.power(np.arange(day_in_season.days)+1,m/n)[::-1][:-1]) #upto and including YESTERDADY
-            #print([anti_vec,day_in_season.days,m,n,m/n])
-            #the anticedent water amounts
-                anti_core_rain=[]           #needs to be calculated
-                anti_dry=[int(ant_cond["Dry"][0])]*len(today_cores) #fixed per site
-                anti_wet=[int(ant_cond["Wet"][0])]*len(today_cores) #fixed per site
-
-                #the probability values (all need to be calculatd)
-                prob_core_rain=[]
-                prob_dry=[]
-                prob_wet=[]
-                mean_vals=ds_rg_hist["mean_vec_"+month_assoc]
-                fits_all=ds_rg_hist["fits_all_"+month_assoc] 
-
-            #regional probability for cores
-                prob_nflics_all=np.amax(dat_poly,axis=0)
-                prob_core_nflics=[]     #core probability for each commune
-                for i_site,region in enumerate(hazard_mapping['wca_admbnda_adm1_ocha shapefile ']):   
-                    #print([i_site,anti_cores[i_site,:].shape,anti_vec.shape])
-                    anti_core_rain.append(np.nansum(anti_cores[i_site,:]*anti_vec))
-                    prob_core_rain.append(tofit_shift(60,fits_all[today_cores[i_site]].data,anti_core_rain[-1]))
-                    prob_dry.append(tofit_shift(60,fits_all[today_cores[i_site]].data,anti_dry[i_site]))
-                    prob_wet.append(tofit_shift(60,fits_all[today_cores[i_site]].data,anti_wet[i_site]))
-                  # SCW May 2023 Had to remove encode for this to work - has the netcdf files changed?
-                  # prob_core_nflics.append(prob_nflics_all[np.where(ds.attrs["poly_ind_freq"]==np.where(poly_names==region.encode())[0][0])][0])
-                    prob_core_nflics.append(prob_nflics_all[np.where(ds.attrs["poly_ind_freq"]==np.where(poly_names==region)[0][0])][0])
-
-                prob_core_nflics=np.array(prob_core_nflics)
-                prob_core_rain=np.array(prob_core_rain)
-                prob_wet=np.array(prob_wet)
-                prob_dry=np.array(prob_dry)
-
-                #flood hazard row in risk matrix (bottom to top)
-                risk_row_core=np.zeros(np.shape(prob_core_nflics)).astype(int)
-                risk_row_wet=np.zeros(np.shape(prob_core_nflics)).astype(int)
-                risk_row_dry=np.zeros(np.shape(prob_core_nflics)).astype(int)
-                haz_l=np.array(hazard_mapping['Low likelihood thresh'])
-                haz_m=np.array(hazard_mapping['Medium likelihood thresh'])
-                haz_h=np.array(hazard_mapping['High likelihood thresh'])
-
-                risk_row_core[np.where((prob_core_nflics*prob_core_rain/100.>=haz_l) & (prob_core_nflics*prob_core_rain/100.<haz_m))]=1
-                risk_row_core[np.where((prob_core_nflics*prob_core_rain/100.>=haz_m) & (prob_core_nflics*prob_core_rain/100.<haz_h))]=2
-                risk_row_core[np.where(prob_core_nflics*prob_core_rain/100.>=haz_h)]=3
-
-                risk_row_wet[np.where((prob_core_nflics*prob_wet/100.>=haz_l) & (prob_core_nflics*prob_wet/100.<haz_m))]=1
-                risk_row_wet[np.where((prob_core_nflics*prob_wet/100.>=haz_m) & (prob_core_nflics*prob_wet/100.<haz_h))]=2
-                risk_row_wet[np.where(prob_core_nflics*prob_wet/100.>=haz_h)]=3
-
-                risk_row_dry[np.where((prob_core_nflics*prob_dry/100.>=haz_l) & (prob_core_nflics*prob_dry/100.<haz_m))]=1
-                risk_row_dry[np.where((prob_core_nflics*prob_dry/100.>=haz_m) & (prob_core_nflics*prob_dry/100.<haz_h))]=2
-                risk_row_dry[np.where(prob_core_nflics*prob_dry/100.>=haz_h)]=3
-
-
-                #vulnerability column for each catchment. Note that this is for a SUBSET of sites
-
-                vul_l=np.array(vul_mapping['Minor impacts thresh'])
-                vul_m=np.array(vul_mapping['Significant impacts thresh'])
-                vul_h=np.array(vul_mapping['Severe impacts thresh'])
-                vul_sort=np.array(vul_mapping['Estimated population affected (2009 populaion)'])
-                vul_geo=np.array(vul_mapping['Geolocation index'])
-                haz_geo=np.array(hazard_mapping['Geolocation index'])
-                vul_col=np.zeros(np.shape(vul_geo)).astype(int)
-
-                vul_col[np.where((vul_sort>=vul_l) & (vul_sort<vul_m))]=1
-                vul_col[np.where((vul_sort>=vul_m) & (vul_sort<vul_h))]=2
-                vul_col[np.where(vul_sort>=vul_h)]=3
-
-
-                vul_col_all=np.zeros(np.shape(haz_geo)).astype(int)-999
-                vul_pop=np.zeros(np.shape(haz_geo)).astype(int)-999
-
-                for v_geo,vul_c,vul_s in zip(vul_geo,vul_col,vul_sort):
-                    vul_col_all[np.where(haz_geo==v_geo)]=vul_c
-                    vul_pop[np.where(haz_geo==v_geo)]=vul_s.round(0)
-
-                toout={'Commune shapefile CCRCA':hazard_mapping['Commune shapefile CCRCA'],\
-                        'Geolocation index':hazard_mapping['Geolocation index'],\
-                        'Prob(core)':prob_core_nflics,\
-                        'Antecedent past-cores':np.array(anti_core_rain).round(0),'Antecedent wet':anti_wet,'Antecedent dry':anti_dry,\
-                        'Prob(rain|past-cores)':prob_core_rain.round(0),'Prob(rain|wet)':prob_wet.round(0),'Prob(rain|dry)':prob_dry.round(0),\
-                        'Risk row past-cores':risk_row_core,'Risk row wet':risk_row_wet,'Risk row dry':risk_row_dry,\
-                         'Risk col':vul_col_all, 'Population at risk':vul_pop}
-
-            #output information
-
-                outpath=plotdir+"/Risk_nowcast_v"+str(nflics_output_version[domain])+"_"+tnow+"_000.csv"  #DO NOT CHANGE - HARD CODED IN GUI
-               # outpath2 = geotiff_outpath+"/Risk_nowcast_v"+str(nflics_output_version_portal)+"_"+tnow+"_000.csv"
-                outpath2 = get_portal_outpath('Risk',tnow)+"/Risk_nowcast_v"+str(nflics_output_version_portal)+"_"+tnow+"_000.csv"
-
-                #outpath="/prj/nflics/RT_code_v2_input/test_out.csv"
-                pd.DataFrame(toout).to_csv(outpath,index=False)
-                if do_geotiff:
-#                   os.system('cp '+outpath+' '+geotiff_outpath)
-                    os.system('cp '+outpath+' '+outpath2)            
-
-
-                #plot the risk and vulnerability information
-                outpath_vul=os.path.join("/",*plotdir.split("/")[:-5],"metadata","vulnerability.png") #DO NOT CHANGE - HARD CODED IN GUI
-
-                if not os.path.exists(outpath_vul): 
-                    vul0_lab=str(min(vul_mapping['Minimal impacts thresh']))
-                    vul1_lab=str(min(vul_mapping['Minor impacts thresh']))
-                    vul2_lab=str(min(vul_mapping['Significant impacts thresh']))
-                    vul3_lab=str(min(vul_mapping['Severe impacts thresh']))
-
-                    use_ylab=["Minimal\n ("+vul0_lab+"-"+vul1_lab+")","Minor\n ("+vul1_lab+"-"+vul2_lab+")",\
-                          "Moderate\n ("+vul2_lab+"-"+vul3_lab+")","Severe\n (>"+vul3_lab+")"]
-                    if do_shared_plots:
-                        plot_slice_risk(ds_dakar,ds_grid_info,grid_poly_ds,vul_col_all,outpath_vul,"vul",\
-                            "Surface water flooding 2009 (population impacted)", 'Impact \n (population)',use_ylab)
-                else:
-                    pass
-                risk_matrix=np.array(([0,0,0,0],[0,0,1,1],[1,1,2,2],[1,2,2,3],[np.nan,np.nan,np.nan,np.nan])).transpose()  #row then column
-
-                outpath_prob="/mnt/prj/nflics/"  #DO NOT CHANGE - HARD CODED IN GUIvul_col_all)
-                vul_col_all[vul_col_all<0]=-1
-                toplt_risk_core=[risk_matrix[r,c] for r,c in zip(risk_row_core, vul_col_all)]
-                toplt_risk_wet=[risk_matrix[r,c] for r,c in zip(risk_row_wet, vul_col_all)]
-                toplt_risk_dry=[risk_matrix[r,c] for r,c in zip(risk_row_dry, vul_col_all)]
-                #print(plotdir+"/Risk_estimated_v"+str(nflics_output_version[domain])+"_"+tnow+"_000.png")
-#            plot_slice_risk(ds_dakar,ds_grid_info,grid_poly_ds,toplt_risk_core,plotdir+"/Risk_estimated_v"+str(nflics_output_version)+"_"+tnow+"_000.png",\
- #                           "risk_ante","Flood Risk \n given estimated surface conditions",'Flood Risk')
- #           plot_slice_risk(ds_dakar,ds_grid_info,grid_poly_ds,toplt_risk_wet,plotdir+"/Risk_wet_v"+str(nflics_output_version)+"_"+tnow+"_000.png",\
- #                           "risk_wet","Flood Risk \n given wet surface ("+ant_cond["Wet"][0]+"mm)",'Flood Risk')
- #           plot_slice_risk(ds_dakar,ds_grid_info,grid_poly_ds,toplt_risk_dry,plotdir+"/Risk_dry_v"+str(nflics_output_version)+"_"+tnow+"_000.png",\
- #                          "risk_dry","Flood Risk \n given dry surface ("+ant_cond["Dry"][0]+"mm)",'Flood Risk')   
-                plot_slice_risk(ds_dakar,geoloc_sub_file[domain],grid_poly_ds,toplt_risk_core,plotdir+"/Risk_estimated_v"+str(nflics_output_version[domain])+"_"+tnow+"_000.png",\
-                            "risk_ante","Flood Risk \n given estimated surface conditions",'Flood Risk')
-                plot_slice_risk(ds_dakar,geoloc_sub_file[domain],grid_poly_ds,toplt_risk_wet,plotdir+"/Risk_wet_v"+str(nflics_output_version[domain])+"_"+tnow+"_000.png",\
-                            "risk_wet","Flood Risk \n given wet surface ("+ant_cond["Wet"][0]+"mm)",'Flood Risk')
-                plot_slice_risk(ds_dakar,geoloc_sub_file[domain],grid_poly_ds,toplt_risk_dry,plotdir+"/Risk_dry_v"+str(nflics_output_version[domain])+"_"+tnow+"_000.png",\
-                           "risk_dry","Flood Risk \n given dry surface ("+ant_cond["Dry"][0]+"mm)",'Flood Risk') 
-						   
-						   
-              #  if int(nflics_output_version)==1: #also output 'unversioned' filename for temporary back compatibility
-              #      plot_slice_risk(ds_dakar,ds_grid_info,grid_poly_ds,toplt_risk_core,plotdir+"/Risk_estimated_"+tnow+"_000.png",\
-              #              "risk_ante","Flood Risk \n given estimated surface conditions",'Flood Risk')
-              #      plot_slice_risk(ds_dakar,ds_grid_info,grid_poly_ds,toplt_risk_wet,plotdir+"/Risk_wet_"+tnow+"_000.png",\
-              #              "risk_wet","Flood Risk \n given wet surface ("+ant_cond["Wet"][0]+"mm)",'Flood Risk')
-              #      plot_slice_risk(ds_dakar,ds_grid_info,grid_poly_ds,toplt_risk_dry,plotdir+"/Risk_dry_"+tnow+"_000.png",\
-              #             "risk_dry","Flood Risk \n given dry surface ("+ant_cond["Dry"][0]+"mm)",'Flood Risk')   
-
-
-
-                                                                                                                 
-            else:
-                pass  
+           # print(['DO RISK',do_risk])  #SRA risk caclualtions moved out
+           # if do_risk==1 and do_risk_subdomain[domain]:   
+           #     #SRA RISK MOVED TO FUNCTION
+           #                                                                                                      
+           # else:
+           #     pass  
         # END OF FUNCTION
         first_pt_ts = [True,True] # nflicsdir, geotiff dir
         for dom in do_full_nowcast:
@@ -1568,7 +1277,46 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     plt.close("all")
     if do_extended_core_calcs:
         # prevent the funnction from ending before the parallel work is completed, to prevent overlap with next file - no loss in time
-        pext.join()                                     
+        pext.join()
+        
+    
+        
+###########################################################
+#  function to get grid locations from  lat lon
+###########################################################
+def get_grid_from_ll(lats_ref, lons_ref, locs):
+    pt_locs=[]
+    for loc in locs.keys():
+       pt_locs.append([(np.abs(lats_ref-locs[loc][0])).argmin(),\
+                 (np.abs(lons_ref-locs[loc][1])).argmin()]) 
+    return(pt_locs)
+    #get the MSG gridpoint from (lat, lon). 1D version
+
+#get the MSG gridpoint from (lat, lon). 2D version
+def get_grid_from_ll_2d(lats_ref, lons_ref, locs):
+    if isinstance(locs,dict):
+        pt_locs={}
+        for loc in locs.keys():
+            lon=locs[loc][1]
+            lat=locs[loc][0]
+            # if len(locs[loc][0])>0:
+                # pt_loc_sub=[]
+                # for sublat,sublon in zip(locs[loc][0],locs[loc][1]):
+                    # dist_sq = (lons_ref - sublon)**2 + (lats_ref - sublat)**2
+                    # min_idx = np.unravel_index(np.argmin(dist_sq), dist_sq.shape)
+                    # pt_loc_sub.append(min_idx)
+                # pt_locs[loc]=list(zip(*pt_loc_sub))
+            # else:
+            dist_sq = (lons_ref - lon)**2 + (lats_ref - lat)**2
+            min_idx = np.unravel_index(np.argmin(dist_sq), dist_sq.shape)
+            pt_locs[loc]=min_idx   
+    else:  #list of locations. Each element in list is a []
+        pt_locs=[]
+        for lat, lon in locs:
+            dist_sq = (lons_ref - lon)**2 + (lats_ref - lat)**2
+            min_idx = np.unravel_index(np.argmin(dist_sq), dist_sq.shape)
+            pt_locs.append(min_idx)
+    return(pt_locs) 
 ###########################################################
 #  function to calculate the rain distributions given coefficients 
 ###########################################################
@@ -2524,72 +2272,6 @@ def OLD_plot_slice_cells_blobs(data,blobs,lats,lons,lats_mid,lons_mid,outfile,re
 	    plt.close()
 
 ###########################################################
-#  function to plot the risk maps
-###########################################################
-def plot_slice_risk(ds_dakar,ds_grid_info,grid_poly_ds,vectoplt,outfile,plot_type="risk",use_title="",use_cbr_title="",use_ylab=""):
-
-    toplt=np.zeros(np.shape(ds_dakar["dakar_lons"]))-999
-    toplt[np.where(ds_dakar["dakar_communes"]>=0)]=0
-    for c,dat_toplt in zip(ds_dakar["commune_ind"],vectoplt):
-        toplt[np.where(ds_dakar["dakar_communes"]==c)]=dat_toplt
-    toplt_m=ma.masked_values(toplt,-999)
-    toplt_poly_dakar_m=ma.masked_values(grid_poly_ds["poly_grid"],-999)
-    commune_edges=ds_dakar["dakar_communes"].data
-    commune_edges[np.where(~np.isfinite(commune_edges))]=-1
-    #sort the colour map
-    from matplotlib.colors import LinearSegmentedColormap
-    colors = [(204/255, 255/255, 153/255), (255/255, 255/255, 50/255),(254/255,151/255,0), (180/255, 0, 0)]
-    cmap=LinearSegmentedColormap.from_list("risk_matrix",colors,4)
-    fig,ax=plt.subplots(figsize=(6, 4))
-    m = Basemap(projection='merc', ax=ax, lat_0=0.,lon_0=0., resolution='l',
-            llcrnrlon=-17.55,llcrnrlat=14.6,urcrnrlon=-17.1,urcrnrlat=14.9)
-    X, Y = m(ds_grid_info["lons_edge"].data,ds_grid_info["lats_edge"].data)
-    Xt, Yt = m(ds_dakar["dakar_lons"].data,ds_dakar["dakar_lats"].data)
-    #pc = m.pcolormesh(X,Y,np.zeros(np.shape(grid_poly_ds["poly_grid"])),cmap='Blues',vmin=-4,vmax=80,lw=2)
-    pc = m.pcolormesh(X,Y,toplt_poly_dakar_m,cmap='Greys',vmin=295,vmax=317,lw=2)
-    pc = m.pcolormesh(Xt,Yt,toplt_m,vmin=0,vmax=4,cmap=cmap,lw=2)
-
-    cbr=plt.colorbar(pc,extend="neither",pad=0.1,shrink=0.6,aspect=10) 
-    cbr.set_ticks([0.5,1.5,2.4,3.5])
-    if plot_type=="vul":
-        cbr.ax.set_yticklabels(use_ylab)
-    else:
-        cbr.ax.set_yticklabels(["V. Low","Low","Medium","High"])
-    cbr.ax.set_title(use_cbr_title,fontsize=10)
-    pc = m.contour(Xt,Yt,commune_edges,levels=np.arange(-1.5,50,0.5),colors="black")
-    plt.title(use_title,pad=0,fontsize=10)
-    ax.text(0.0, 0.0, 'Region for convective structure probability', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="darkgrey")
-    ax.text(0.0, -0.2, 'Click on Commune to see additional information and Flood Risk matrix', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black")
-    #ax.text(0.0, 0.0, 'Region for convective structure probability', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="darkgrey")ax.text(0.3, -0.1, 'Estimated surface', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black")
-    if plot_type=="vul":
-        ax.text(0.0, -0.1, 'Vulnerability', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black",weight="bold")
-        ax.text(0.3, -0.1, 'Estimated surface', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black")
-        ax.text(0.7, -0.1, 'Wet surface', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black")
-        ax.text(1.0, -0.1, 'Dry surface', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black")
-    elif plot_type=="risk_ante":
-        ax.text(0.0, -0.1, 'Vulnerability', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black")
-        ax.text(0.3, -0.1, 'Estimated surface', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black",weight="bold")
-        ax.text(0.7, -0.1, 'Wet surface', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black")
-        ax.text(1.0, -0.1, 'Dry surface', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black")
-    elif plot_type=="risk_wet":
-        ax.text(0.0, -0.1, 'Vulnerability', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black")
-        ax.text(0.3, -0.1, 'Estimated surface', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black")
-        ax.text(0.7, -0.1, 'Wet surface', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black",weight="bold")
-        ax.text(1.0, -0.1, 'Dry surface', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black")
-    elif plot_type=="risk_dry":
-        ax.text(0.0, -0.1, 'Vulnerability', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black")
-        ax.text(0.3, -0.1, 'Estimated surface', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black")
-        ax.text(0.7, -0.1, 'Wet surface', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black")
-        ax.text(1.0, -0.1, 'Dry surface', va='bottom', ha='left',rotation='horizontal', rotation_mode='anchor',transform=ax.transAxes,color="black",weight="bold")
-    fig.set_size_inches(6,4)  
-    plt.tight_layout(pad=1)
-    ax.set_position((0.02, 0.1684, 0.6758, 0.6988))
-    if type(outfile)== str:
-        plt.savefig(outfile,dpi=400)
-    else:
-        plt.show()
-        plt.close()
-###########################################################
 #  function to plot the LST and core maps
 ###########################################################
 def plot_slice_lst(data_lst,data_lats,data_lons,blobs,lats,lons,lats_mid,lons_mid,outfile,res,plot_lims,cell_thresh,use_cbr_title,sizes=False,\
@@ -2887,8 +2569,8 @@ def pcalc_run(h, LSTA_array, table_path):
 def write_site_cores(csvfile,places,locs,anyblobs):
     with open(csvfile,'w') as ff:
         ff.write('Location,Latitude,Longitude,isCore\n')
-        for site in range(len(places)):
-            ff.write(','.join([places[site],str(locs[site][0]),str(locs[site][1]),str(int(anyblobs[site]))])+'\n') 
+        for isite,site in enumerate(places):
+            ff.write(','.join([site,str(locs[site][0]),str(locs[site][1]),str(int(anyblobs[isite]))])+'\n') 
 
 def plt_nflics_ts(forigin,ts,places,locs,plotfile,csvfile,filters,nhrs=6,fixed=False,writeType='w'):
 
@@ -2902,23 +2584,26 @@ def plt_nflics_ts(forigin,ts,places,locs,plotfile,csvfile,filters,nhrs=6,fixed=F
          if writeType=='w':
              ff.write('Location,Latitude,Longitude,'+','.join(['Filter_T+'+str(ihr).zfill(2)+'hr' for ihr in hrList])+','+','.join(['Prob_T+'+str(ihr).zfill(2)+'hr' for ihr in hrList])+'\n')
 
-         for site in range(len(places)):
-            
-            ff.write(','.join([places[site]]+[str(i) for i in locs[site]]+[str(round(i,2)) for i in filters]+[str(i) for i in ts[site]])+'\n')
+         for isite,site in enumerate(places): #SRA edited for dict locs           
+            ff.write(','.join([site]+[str(i) for i in locs[site]]+[str(round(i,2)) for i in filters]+[str(i) for i in ts[isite]])+'\n')
 
 
     # 2 plot it 
     # hours (hard coded to 6)
-    t = np.arange(nhrs+1)  
+    t = np.arange(nhrs+1)
+    print("t:",t)
+    print("ts[:]:",ts)
+       
     if not fixed:  # only plot for varibale pixel (ie database, not portal)
         ForcOrigin = forigin
         nlocations = len(places)
-        for iax in range(nlocations):
+        for iax,place in enumerate(places):
+            print("iax:",iax)
             ax = plt.subplot(nlocations,1,1+iax)
             plt.plot(t, ts[iax])
             plt.setp(ax.get_xticklabels(), fontsize=6)
             plt.setp(ax.get_yticklabels(), fontsize=6)
-            plt.text(0.1, 100, places[iax]+' ('+str(locs[iax][1])+'E,'+str(locs[iax][0])+'N)', fontsize=8)
+            plt.text(0.1, 100, place+' ('+str(locs[place][1])+'E,'+str(locs[place][0])+'N)', fontsize=8)
             plt.xlim(0.0, 6.0)
             plt.ylim(0.0, 120)
             if iax==nlocations-1:
@@ -3025,7 +2710,12 @@ def make_geoTiff(data,rasFile,doReproj = True,origEPSG='4326',newEPSG='3857',rep
         rasFile_distort = reprojFile[:-4]+'_distort.tif'
         os.system('gdalwarp -cutline '+distortMask+' -crop_to_cutline -dstnodata -999 '+reprojFile+' '+rasFile_distort)
         os.system('mv '+rasFile_distort+' '+reprojFile)
-    os.system('gdaladdo -r average '+reprojFile+' 2 4 8 16 32')
+    
+    
+    addofile = reprojFile if doReproj else rasFile2
+    os.system('gdaladdo -r average '+addofile+' 2 4 8 16 32')
+    
+    #os.system('gdaladdo -r average '+reprojFile+' 2 4 8 16 32')
 #gdalwarp -cutline ctt_cutout.shp -crop_to_cutline -dstnodata 0 Observed_CTT_202502100630_extended_3857.tif outtest3.tif
     
 
@@ -3114,12 +2804,26 @@ def rect_rt_loop(dat_rect,use_rect,datadir,i_search,load_time,filters_real_time,
     return(dat_rect_max,missing_database_vec_t,poly_val_freq)
 
 
-def get_portal_outpath(datatype,tnow,viaS = False):
+def get_portal_outpath(datatype,tnow,lawisDirs,viaS = False):
+    if lawisDirs["lawisOffline"]:  #SRA 04/26 added offline option. Send everything here offline!
+        tstring = tnow[:8]
+        outRoot = lawisDirs['offlineDir']
+        outDirs = {'Nowcast':os.path.join(outRoot,'geotiff','lawis_nowcast',tstring),
+                   'CTT':os.path.join(outRoot,'geotiff','lawis_ctt',tstring),
+                   'ConStruct':os.path.join(outRoot,'geotiff','lawis_construct',tstring),
+                   'PastCores':os.path.join(outRoot,'geotiff','lawis_past_cores',tstring),
+                   'Vis':os.path.join(outRoot,'geotiff','lawis_visible_channel',tstring),
+                   'Nowcast_ts':os.path.join(outRoot,'lawis-west-africa','nflics_nowcast',tstring),
+                   'Risk':os.path.join(outRoot,'lawis-west-africa','nflics_nowcast',tstring)}
+        if not os.path.exists(outDirs[datatype]):
+            os.makedirs(outDirs[datatype])
+        return outDirs[datatype]
+        
     if viaS:
-        return '/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data'
-    
+        return lawisDirs["viaSDir"]
+        
     tstring = tnow[:8]
-    outRoot = '/mnt/HYDROLOGY_stewells/'
+    outRoot = lawisDirs["mntDir"]
     outDirs = {'Nowcast':os.path.join(outRoot,'geotiff','lawis_nowcast',tstring),
 	           'CTT':os.path.join(outRoot,'geotiff','lawis_ctt',tstring),
 			   'ConStruct':os.path.join(outRoot,'geotiff','lawis_construct',tstring),
