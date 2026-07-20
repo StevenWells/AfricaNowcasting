@@ -443,10 +443,12 @@ def run_flood_risk(tnow,lawisDirs,options,plotbase):
     ##########################################
     #Nowcast probabilites for each commune P_NFLICS(core)
     ncast_prob_all=[]
-    ncast_dir="/mnt/users/hymod/seodey/NFLICS/nflics_current/lawis-west-africa/nflics_nowcast/20250909/Nowcast_risk/"
+    #ncast_dir="/mnt/users/hymod/seodey/NFLICS/nflics_current/lawis-west-africa/nflics_nowcast/20250909/Nowcast_risk/"
+    ncast_dir=get_portal_outpath('Risk',tnow,lawisDirs)+"/Nowcast_risk/"
+
     for lead in [str(x).zfill(3) for x in np.arange(60,420,60)]:
         print(lead)
-        ncast_prob_all.append(pd.read_csv(ncast_dir+"nflics_nowcast_pt_202509090800_"+lead+".csv")[lead].tolist())
+        ncast_prob_all.append(pd.read_csv(ncast_dir+"nflics_nowcast_pt_"+tnow+"_"+lead+".csv")[lead].tolist())
         
     ncast_prob_all=np.array(ncast_prob_all)    
     prob_core_nflics=np.amax(ncast_prob_all,axis=0)#P_NFLICS(core)
