@@ -390,7 +390,7 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
         else:
             pass
 
-        sfile =use_file[:-3]+'.nc' if  options["feed"]=='eumdat' else use_file
+        sfile =use_file[:-3]+'_eumdat.nc' if  options["feed"]=='eumdat' else use_file
 
         print(use_file,sfile)
 # if file already in saved folder assume processed and exit function for this file
