@@ -1,3 +1,12 @@
+#"""
+#Scrtipt to calculate real-time RoA accumulations and output GeoTiff files for the portal
+#Call for historical calculatis
+#python portal_roa_accums.py --mode historical --startDate 202608302345 --endDate 202608310000 
+#ep 2026 - SRA Edited to provide API outputs:
+#               for accPeriod 24h @ 0800, save .nc file to nowcast dir and also 
+#               accumulate the past 30 days.nc files to create the API
+#         SRA changed average to include the endpoint (for trepezioidal averaging)
+#"""
 import rasterio
 import xarray as xr
 import numpy as np
@@ -13,12 +22,20 @@ delta_y = 0.02701789935
 delta_x = 0.02701729106
 
 dataDir='/mnt/prj/swift/rain_over_africa'
-tmpDir='/home/stewells/AfricaNowcasting/tmp/'
-geotiffDir = '/mnt/HYDROLOGY_stewells/geotiff/ssa_africarain_precip_accum/'
-backupDir = '/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data'
+#tmpDir='/home/stewells/AfricaNowcasting/tmp/'
+tmpDir='/mnt/users/hymod/seodey/NFLICS/RoA_files/tmp/'
+#geotiffDir = '/mnt/HYDROLOGY_stewells/geotiff/ssa_africarain_precip_accum/'
+geotiffDir = '/mnt/users/hymod/seodey/NFLICS/RoA_files/ssa_africarain_precip_accum/'
+#backupDir = '/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data'
+backupDir = '/mnt/users/hymod/seodey/NFLICS/RoA_files/backup'
+nflicsDir='/mnt/users/hymod/seodey/NFLICS/nflics_nowcasts/'   #for saving the .nc files for calculating the API
+
 #geotiffDir = '/home/stewells/AfricaNowcasting/satTest/'
 testDate = '202406201300'
-accPeriods = [1,3,6,24,48,72]
+#accPeriods = [1]#,3]#,6,24,48,72]                       
+accPeriods = [24]                       
+outputNChr=8                                                  
+outputNCacc=24
 
 toSdir = False
 
@@ -91,19 +108,22 @@ def getAccs(tnow,accPeriods,dataDir,tmpDir,geotiffDir):
     #initialise total
     accArray = np.copy(iacc)
     for ix,ifile in enumerate(filelist):
-        #print(ifile)
+        print(ix,ifile)
         try:
             dfile = xr.open_dataset(ifile)
             iacc =dfile.variables['posterior_mean'][:,:]
         except:
             print("Missing file "+ifile)
 
-        if ix==0: # half the first value for accumulation
+        if ix==0: # half the first (last) value for accumulation
             iacc = iacc/2.0
-        if ix in [x*4-1 for x in accPeriods]: # list of indices corresponding to accumulation periods
+            dfile0=dfile
+            #print(dfile)
+            #print(dfile["acq_time"].data)
+        if ix in [x*4 for x in accPeriods]: # list of indices corresponding to accumulation periods
             acchr = int((ix+1)/4)
-            print(str(acchr)+'hr')
-            accArr_i = np.array(np.round(0.25*np.add(accArray,iacc/2.0),2))
+            print(str(acchr)+'hr', str(ix))
+            accArr_i = np.array(np.round(0.25*np.add(accArray,iacc/2.0),2))#0.25 to convert from mm/h to mm/15min for sum
             accArr_i[accArr_i < 1] = 0.0
             rasPath = os.path.join(tmpDir,"HSAF_precip_acc"+str(acchr)+"h_"+tnowStr+"_SSA.tif")
             if toSdir:
@@ -114,8 +134,68 @@ def getAccs(tnow,accPeriods,dataDir,tmpDir,geotiffDir):
             make_geoTiff([accArr_i],rasPath,reprojFile=rasPath_3857,trim=True)
             os.system('rm '+rasPath)
 
+            if tnow.hour==outputNChr and tnow.minute==0 and acchr ==outputNCacc:
+                print("saving .nc output for hour-of-day",outputNChr,"acc", acchr, "h") 
+                ds=xr.Dataset() #create dataset to save to netcdf for future use
+                ds['posterior_mean_24h']=xr.DataArray(accArr_i, coords={'latitude': dfile.coords["latitude"].data , 'longitude': dfile.coords["longitude"].data},dims=['latitude', 'longitude']) 
+                ds.attrs["start_time_first"]=dfile.attrs["start_time"]
+                ds.attrs["start_time_last"]=dfile0.attrs["start_time"]               
+                ds.attrs["end_time_first"]=dfile.attrs["end_time"]
+                ds.attrs["end_time_last"]=dfile0.attrs["end_time"]                
+                ds.attrs["acc_period"]=outputNCacc
+                ds.attrs["acc_method"]="trapezoidal, start_time to end_time"
+                ds.attrs["acc_label"]="end_time_first"                
+                comp = dict(zlib=True, complevel=5)
+                enc = {var: comp for var in ds.data_vars}
+                outpathNC=os.path.join(nflicsDir,str(tnow.year), str(tnow.month).zfill(2),str(tnow.day).zfill(2))
+                outfileNC=os.path.join(outpathNC,"rainoverAfrica_SSA_"+tnowStr+"_acc"+str(acchr)+"h.nc")
+                print("saving .nc output to", outfileNC)
+                if not os.path.exists(outpathNC):
+                    os.makedirs(outpathNC)            
+                ds.to_netcdf(path=outfileNC,mode='w', encoding=enc, format='NETCDF4') 
+ 
+                #second calculate the API 
+                API_w=np.power(0.9,np.arange(0,30,1))
+                API=[accArr_i]
+                #add the weighted sum of previous 30 DAILY accumulations
+                for iAPI,dAPI in enumerate([tnow - n*datetime.timedelta(hours=24)  for n in np.arange(1,30)]):
+                    print(iAPI, dAPI)
+                    outpathNCi=os.path.join(nflicsDir,str(dAPI.year), str(dAPI.month).zfill(2),str(dAPI.day).zfill(2))
+                    outfileNCi=os.path.join(outpathNCi,"rainoverAfrica_SSA_"+dAPI.strftime('%Y%m%d%H%M')+"_acc"+str(acchr)+"h.nc")
+                    dsi=xr.open_dataset(outfileNCi)
+                    API.append(dsi["posterior_mean_24h"]*API_w[iAPI+1])
+                API=np.array(API)
+                APIsum=np.sum(API, axis=0)
+                
+                #save as .tiff and .nc for checking
+                print("saving .nc output for hour-of-day",outputNChr,"acc", acchr, "h") 
+                ds=xr.Dataset() #create dataset to save to netcdf for future use
+                ds['API']=xr.DataArray(APIsum, coords={'latitude': dfile.coords["latitude"].data , 'longitude': dfile.coords["longitude"].data},dims=['latitude', 'longitude']) 
+                ds.attrs["calulation"]="0.9^n-1*Pn for n =1:30 is number of days before today"
+                ds.attrs["units"]="mm"
+                
+                comp = dict(zlib=True, complevel=5)
+                enc = {var: comp for var in ds.data_vars}
+                outpathNC=os.path.join(nflicsDir,str(tnow.year), str(tnow.month).zfill(2),str(tnow.day).zfill(2))
+                outfileNC=os.path.join(outpathNC,"rainoverAfrica_SSA_"+tnowStr+"_API30_"+str(tnow.hour).zfill(2)+"00.nc")
+                print("saving .nc output to", outfileNC)
+                if not os.path.exists(outpathNC):
+                    os.makedirs(outpathNC)            
+                ds.to_netcdf(path=outfileNC,mode='w', encoding=enc, format='NETCDF4') 
+                
+                #calculate and save .tiff
+                rasPath = os.path.join(tmpDir,"ROA_precip_API_"+tnowStr+"_SSA.tif")
+                if toSdir:
+                    rasPath_3857 = os.path.join(backupDir,"ROA_precip_API_"+tnowStr+"_3857.tif")
+                else:
+                    rasPath_3857 = os.path.join(geotiffDir,tnow.strftime('%Y%m%d'),"ROA_precip_API_"+tnowStr+"_3857.tif")
+                
+                make_geoTiff([APIsum],rasPath,reprojFile=rasPath_3857,trim=True)
+                os.system('rm '+rasPath)
+                
+#   print(ifile)
 
-        accArray = np.add(accArray,iacc)
+        accArray = np.add(accArray,iacc) #acc array is factor of 4 out (this is delt with upon output)
     return 
 
 
@@ -125,7 +205,7 @@ if __name__ == '__main__':
     parser=argparse.ArgumentParser(prog='portal_roa_accums.py')
     parser.add_argument("--mode", choices=["realtime","historical"], default="realtime",help="Run mode (real time or historical)")
     parser.add_argument("--startDate", type=str, help="Start Date of T0 file (YYYYMMDDhhmm).")
-    parser.add_argument("--endDate", type=str, help="Start Date of T0 file (YYYYMMDDhhmm).")
+    parser.add_argument("--endDate", type=str, help="End Date of T0 file (YYYYMMDDhhmm).")
     parser.add_argument('--dataDir',type=str,default=dataDir,help='directory to process ROA files from')
     parser.add_argument('--tmpDir',type=str,default=tmpDir,help='directory to hold temporary files')
     parser.add_argument('--geotiffDir',type=str,default=geotiffDir,help='directory to save outputs geoTiffs')
@@ -194,7 +274,7 @@ if __name__ == '__main__':
             print("start date rounded to nearest interval matching raw data")
             endDate = round_edate
         # get list of dates
-        dateList = generate_dates(startDate,endDate,15)
+        dateList = generate_dates(startDate,endDate,1440)   #SRA EDITED FOR DAILY PROCESSING - CHANGE BACK!!!!!
         new_files = [x.strftime('%Y%m%d%H%M') for x in dateList if reprocess or not os.path.exists(os.path.join(geotiffDir,x.strftime("%Y%m%d"),x.strftime('rainoverAfrica_SSA_%Y%m%d%H%M_acc1h_3857.tif')))]
 
     print(new_files)
