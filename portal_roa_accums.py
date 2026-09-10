@@ -41,7 +41,7 @@ nflicsDir='/mnt/prj/nflics/nflics_nowcasts/'
 testDate = '202406201300'
 accPeriods = [1,3,6,24,48,72]                       
 #accPeriods = [24]                       
-outputNChr=8                                                     
+outputNChr=6                                                     
 outputNCacc=24
 
 toSdir = False
