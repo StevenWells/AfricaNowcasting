@@ -125,9 +125,9 @@ open(1,file='/mnt/scratch/stewells/MTG_LI0691/flash_count_NRT/'//datestamp(1)//'
        form='unformatted',access='direct',recl=2*nx*ny)
 write(1,rec=1) gflash(:,:,step) ; close(1)
 !
-!!!open(1,file='/mnt/prj/swift/MTG_flash_count/'//chyear//'/'//chmon//'/'//datestamp(1)//'.gra',&
-!!!       form='unformatted',access='direct',recl=2*nx*ny)
-!!!write(1,rec=1) gflash(:,:,step) ; close(1)
+open(1,file='/mnt/prj/swift/MTG_LI_flash_count/'//chyear//'/'//chmon//'/'//datestamp(1)//'.gra',&
+       form='unformatted',access='direct',recl=2*nx*ny)
+write(1,rec=1) gflash(:,:,step) ; close(1)
 !
 if(datestamp(2).ne.datestamp(1)) then
   open(1,file='/mnt/scratch/stewells/MTG_LI0691/flash_count_NRT/'//datestamp(2)//'.gra',&

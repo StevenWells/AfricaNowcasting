@@ -6,7 +6,7 @@ conda activate py37
 
 OUTDIR_RAW='/mnt/scratch/stewells/MTG_LI0691/raw'
 OUTDIR_TIDY='/mnt/scratch/stewells/MTG_LI0691/tidy'
-ARCHIVE_DIR=/mnt/prj/swift/MTG_flash_count/`date -u +%Y"/"%m`
+ARCHIVE_DIR=/mnt/prj/swift/MTG_LI_flash_count/`date -u +%Y"/"%m`
 GRA_SCRATCHDIR='/mnt/scratch/stewells/MTG_LI0691/flash_count_NRT'
 
 # prepare areas
