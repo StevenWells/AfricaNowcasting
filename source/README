@@ -14,3 +14,8 @@ lst_anom_py.90
 - executable called by afnow_sm6k.sh script to create AM/PM files
 grid_NRT_vn2J_afnow.f90   
 
+# MTG Lightning
+- fortran. Builds to grid_NRT_LI_afnow to be called by afnow_mtg_LI.sh
+- build with
+        gfortran grid_NRT_data_vn1_afnow.f90 $(nf-config --fflags) $(nf-config --flibs) -o grid_NRT_LI_afnow
+grid_NRT_data_vn1_afnow.f90

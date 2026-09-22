@@ -47,8 +47,21 @@ parser.add_argument("--mode", choices=["realtime","historical"], default="realti
 parser.add_argument("--startDate", type=str, help="Start Date (YYYYMMDDhhmm).")
 parser.add_argument("--endDate", type=str, help="Start Date (YYYYMMDDhhmm).")
 
+# where to look for data
+parser.add_argument("--sourceDir", type=str, default = dataDir, help="Directory where raw data is stored (default: "+dataDir+")")
+
 # to portal
-parser.add_argument("--toPortal", type=bool, default = True, help="Send data to portal (True) or local (False)")
+parser.add_argument("--toPortal", type=str, default ="true", help="Send data to portal (True) or local (False)")
+
+def str2bool(v):
+    if isinstance(v, bool):
+       return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
 # if historical then load the start and end date
@@ -68,6 +81,7 @@ def generate_dates(start,end,interval):
 # get the arguments
 args = parser.parse_args()
 
+args.toPortal = str2bool(args.toPortal)
 # sort out directories to use
 
 if args.toPortal:
