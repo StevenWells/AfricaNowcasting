@@ -1,0 +1,16 @@
+## Source code for various processes that use the compiled executable ##
+
+
+# MTG daily mean LSTA
+- build script
+build_lst_anom
+- fortran. Build to lst_anom_py.so to be called by LSTA python script via ctypes  
+lst_anom_py.90
+
+# Soil moisture anomaly
+- fortran source (CMT - grid_NRT_vn2J.f90)
+- build with 
+     gfortran grid_NRT_vn2J_afnow.f90 $(nf-config --fflags) $(nf-config --flibs) -o grid_NRT_vn2J_afnow
+- executable called by afnow_sm6k.sh script to create AM/PM files
+grid_NRT_vn2J_afnow.f90   
+

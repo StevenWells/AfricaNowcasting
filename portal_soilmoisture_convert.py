@@ -60,7 +60,7 @@ parser.add_argument("--endDate", type=str, help="Start Date (YYYYMMDDhhmm).")
 parser.add_argument("--outDir", type=str, default = outPath, help="Directory to send outputs to (defaults to SAN)")
 
 #domain
-parser.add_argument("--domain", choices=["WA","SSA","SSA_6k"], default="SSA",help="Domain: West Africa (WA) or Sub-Saharan Africa (SSA) or High Res SSA (SSA_6k)")
+parser.add_argument("--domain", choices=["WA","SSA","SSA_6k","SSA_6k_archive"], default="SSA",help="Domain: West Africa (WA) or Sub-Saharan Africa (SSA) or High Res SSA (SSA_6k)")
 
 # load them
 args = parser.parse_args()
@@ -70,13 +70,16 @@ if args.domain=='WA':
     sourcePath = '/mnt/prj/swift/ASCAT_cmt/NRT_anomalies/'
 elif args.domain == 'SSA_6k':
     sourcePath = '/mnt/scratch/cmt/sm_6km_test/'
+elif args.domain=='SSA_6k_archive':
+    sourcePath = '/mnt/prj/swift/ASCAT_H122/H122_vn2J_daily/'
 else:
     sourcePath = '/mnt/prj/swift/ASCAT_SSA/NRT_anomalies/'
 
 
 domainPars = {'WA':{'nx_raw':274,'ny_raw':162,'deltax':0.25,'xll':-18.125,'yll':-15.125,'bytes':'f'},
              'SSA':{'nx_raw':293,'ny_raw':242,'deltax':0.25,'xll':-18.125,'yll':-35.125,'bytes':'f'},
-             'SSA_6k':{'nx_raw':730,'ny_raw':602,'deltax':0.1,'xll':-17.95,'yll':-35.0,'bytes':'h'}}
+             'SSA_6k':{'nx_raw':730,'ny_raw':602,'deltax':0.1,'xll':-17.95,'yll':-35.0,'bytes':'h'},
+             'SSA_6k_archive':{'nx_raw':730,'ny_raw':602,'deltax':0.1,'xll':-17.95,'yll':-35.0,'bytes':'h'}}
 
 # backup output folder if satdev is down
 toSdir = False
@@ -122,6 +125,8 @@ if args.mode =='historical':
         print([x,sourcePath])
         if args.domain == 'SSA_6k':
             all_files+=glob.glob(os.path.join(sourcePath,x.strftime('ASCAT_dsm_%Y%m%d_*')))
+        elif args.domain == 'SSA_6k_archive':
+            all_files+=glob.glob(os.path.join(sourcePath,x.strftime("%Y/%m"),x.strftime('ASCAT_dsm_%Y%m%d_*')))
         else:
             all_files+=glob.glob(os.path.join(sourcePath,x.strftime("%Y%m"),x.strftime('ASCAT_dsm_%Y%m%d_*')))
 
@@ -131,6 +136,8 @@ else: # realtime - this has all the files that were modified since the last time
     all_files = []
     if args.domain == 'SSA_6k':
         total_files=glob.glob(os.path.join(sourcePath,'ASCAT_dsm_*'))
+    elif args.domain == 'SSA_6k_archive':
+        total_files=glob.glob(os.path.join(sourcePath,'*','*','ASCAT_dsm_*'))
     else:
         total_files=glob.glob(os.path.join(sourcePath,'*','ASCAT_dsm_*'))
     
@@ -160,7 +167,7 @@ for root in all_files:
         #outdir = os.path.join(outPath,dateStr)
         outdir = os.path.join(args.outDir,dateStr)
     rasFile = filename.split('.')[0]+'.tif'
-    if args.domain == 'SSA_6k':
+    if args.domain in ['SSA_6k','SSA_6k_archive']:
         reprojFile = filename.split('.')[0]+'_6k_'+str(newEPSG)+'.tif'
         tilefile =filename.split('.')[0]+'_6k_'+str(newEPSG)+'_tiling.tif'
     else:
@@ -176,7 +183,7 @@ for root in all_files:
     data=np.array(gen_ints).reshape(ny_raw,nx_raw)
     data= data[:]
 
-    if args.domain == 'SSA_6k':
+    if args.domain in ['SSA_6k','SSA_6k_archive']:
         data = data/100.
         data[data< -300] = -999
 

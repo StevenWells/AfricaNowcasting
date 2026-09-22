@@ -1,0 +1,2 @@
+gfortran -fPIC -c lst_anom_py.f90 $(nf-config --fflags)
+gfortran -shared -o liblst_anom.so lst_anom_py.o $(nf-config --flibs)
