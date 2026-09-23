@@ -1,5 +1,10 @@
 #!/bin/bash
 set -ex
+date
+source /etc/profile.d/conda.sh
+conda activate py311_netncc
+
+
 DOWNLOAD_DIR=/mnt/scratch/stewells/MSG_NRT/in
 mkdir -p $DOWNLOAD_DIR
 #vn='_d7a'
@@ -69,3 +74,6 @@ fi
 #
 #ls -lt $DOWNLOAD_DIR|head
 #ls -lt /mnt/scratch/stewells/MSG_NRT/cut/*.nc|head
+
+# run netNCC code
+python /home/stewells/AfricaNowcasting/rt_code/PanAfrica_NetNCC_leadtimes_1to6_0p05deg.py --mode realtime
