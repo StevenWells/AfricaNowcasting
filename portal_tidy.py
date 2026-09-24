@@ -14,7 +14,7 @@ import datetime
 
 # SAN root
 sanRoot = '/mnt/HYDROLOGY_stewells/geotiff/'
-cutoff = 101 # days
+cutoff = 120 # days
 
 
 tnow = datetime.datetime.now()
@@ -30,7 +30,7 @@ EVENTS = [[datetime.datetime(2026,6,1,0,0),datetime.datetime(2026,6,30,23,45)]]
 
 # products to be remvoed
 # these names should be the folder names in sanRoot
-ProdsToCull = ['ssa_hsaf_precip','ssa_hsaf_precip_accum','lawis_nowcasts',
+ProdsToCull = ['ssa_hsaf_precip','ssa_hsaf_precip_accum',
                'ssa_africarain_precip','ssa_africarain_precip_accum','lawis_visible_channel']
 
 for iprod in ProdsToCull:
