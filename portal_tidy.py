@@ -21,6 +21,13 @@ tnow = datetime.datetime.now()
 tminus_cutoff = tnow  -datetime.timedelta(days=cutoff)
 tminus_lowerbound = tminus_cutoff - datetime.timedelta(days=40)
 
+
+# EVENTS: list of two-element lists of events, [[start,end],....] to be excluded from purge
+EVENTS = [[datetime.datetime(2026,6,1,0,0),datetime.datetime(2026,6,30,23,45)]]
+
+
+
+
 # products to be remvoed
 # these names should be the folder names in sanRoot
 ProdsToCull = ['ssa_hsaf_precip','ssa_hsaf_precip_accum','lawis_nowcasts',
@@ -30,6 +37,15 @@ for iprod in ProdsToCull:
     print(iprod)
     ppath = os.path.join(sanRoot,iprod)
     alldirs = sorted([x for x in  glob.glob(ppath+'/*') if (datetime.datetime.strptime(x.split('/')[-1],"%Y%m%d") < tminus_cutoff) and (datetime.datetime.strptime(x.split('/')[-1],"%Y%m%d") > tminus_lowerbound) ])
+    # now exclude events that may still fall in that window
+    #print(alldirs)
+    alldirs = [x for x in alldirs if not any([ (datetime.datetime.strptime(x.split('/')[-1],"%Y%m%d") >= e[0]) and (datetime.datetime.strptime(x.split('/')[-1],"%Y%m%d") <= e[1]) for e in EVENTS])]
+    #print(alldirs)
+
+
+    
+    
+    
     if iprod == 'ssa_hsaf_precip_accum':
         for deldir in alldirs:
             for acc in [1,3,6,48,72]:
