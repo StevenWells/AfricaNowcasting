@@ -84,6 +84,8 @@ args = parser.parse_args()
 args.toPortal = str2bool(args.toPortal)
 # sort out directories to use
 
+dataDir = args.sourceDir
+
 if args.toPortal:
     outDir = portalDir
     archiveDir=liveArchiveDir
@@ -142,7 +144,7 @@ elif args.mode=='realtime':
     t0 = datetime.datetime.today()
     #total_files=glob.glob(os.path.join(dataDir,str(t0.year),str(t0.month).zfill(2),'*.gra'))
     total_files=glob.glob(os.path.join(dataDir,'*.gra'))
-
+    print(total_files)
     for f in total_files:
         modTimesinceEpoc = os.path.getmtime(f)
         modificationTime = datetime.datetime.fromtimestamp(time.mktime(time.localtime(modTimesinceEpoc)))
