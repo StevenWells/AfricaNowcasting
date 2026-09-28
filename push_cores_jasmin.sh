@@ -26,7 +26,7 @@
 # location of the cores outputted from satdev processing
 SCRATCHDIR="/mnt/scratch/NFLICS/nflics_current"
 #REMOTEDIR="/gws/nopw/j04/cehhmf/hmf/NFLICS/rt_cores/outputs/real_time_data/"
-REMOTEDIR="/gws/nopw/j04/swift/rt_cores/"
+REMOTEDIR="/gws/ssde/j25b/swift/rt_cores/"
 
 eval $(ssh-agent -s)
 ssh-add ~/.ssh/id_ecdsa_jasmin
