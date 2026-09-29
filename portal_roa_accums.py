@@ -27,12 +27,12 @@ delta_y = 0.02701789935
 delta_x = 0.02701729106
 
 dataDir='/mnt/prj/swift/rain_over_africa'
-tmpDir='/home/stewells/AfricaNowcasting/tmp/'
-#tmpDir='/mnt/users/hymod/seodey/NFLICS/RoA_files/tmp/'
-geotiffDir = '/mnt/HYDROLOGY_stewells/geotiff/ssa_africarain_precip_accum/'
-#geotiffDir = '/mnt/users/hymod/seodey/NFLICS/RoA_files/ssa_africarain_precip_accum/'
-backupDir = '/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data'
-#backupDir = '/mnt/users/hymod/seodey/NFLICS/RoA_files/backup'
+#tmpDir='/home/stewells/AfricaNowcasting/tmp/'
+tmpDir='/mnt/users/hymod/seodey/NFLICS/RoA_files/tmp/'
+#geotiffDir = '/mnt/HYDROLOGY_stewells/geotiff/ssa_africarain_precip_accum/'
+geotiffDir = '/mnt/users/hymod/seodey/NFLICS/RoA_files/ssa_africarain_precip_accum/'
+#backupDir = '/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data'
+backupDir = '/mnt/users/hymod/seodey/NFLICS/RoA_files/backup'
 #nflicsDir='/mnt/users/hymod/seodey/NFLICS/nflics_nowcasts/'   #for saving the .nc files for calculating the API
 nflicsDir='/mnt/prj/nflics/nflics_nowcasts/' 
 
@@ -40,7 +40,7 @@ nflicsDir='/mnt/prj/nflics/nflics_nowcasts/'
 testDate = '202406201300'
 #accPeriods = [1]#,3]#,6,24,48,72]                       
 accPeriods = [24]                       
-outputNChr=8                                                  
+outputNChr=6                                                  
 outputNCacc=24
 
 toSdir = False
@@ -136,17 +136,35 @@ def getAccs(tnow,accPeriods,dataDir,tmpDir,geotiffDir):
     iacc = np.zeros((2962,2777))
     #initialise total
     accArray = np.copy(iacc)
-    for ix,ifile in enumerate(filelist):
+    nfile=0
+    for ix,ifile in enumerate(filelist):             
         print(ix,ifile)
         try:
             dfile = xr.open_dataset(ifile)
             iacc =dfile.variables['posterior_mean'][:,:]
+            nfile=nfile+1
         except:
-            print("Missing file "+ifile)
+            print("Missing file "+ifile+"-> try 04")
+            try:
+                ifile=ifile.replace("MSG3","MSG4")
+                dfile = xr.open_dataset(ifile)
+                iacc =dfile.variables['posterior_mean'][:,:]
+                nfile=nfile+1
+            except:
+                print("Missing file "+ifile+"-> try 02")
+                try:
+                    ifile=ifile.replace("MSG4","MSG2")
+                    dfile = xr.open_dataset(ifile)
+                    iacc =dfile.variables['posterior_mean'][:,:]
+                    nfile=nfile+1
+                except:
+                    print("Missing file "+ifile+"Giving up!")
 
         if ix==0: # half the first (last) value for accumulation
             iacc = iacc/2.0
+        if nfile==1:  #get info for saved ,nc file
             dfile0=dfile
+            print(dfile0)
             #print(dfile)
             #print(dfile["acq_time"].data)
         if ix in [x*4 for x in accPeriods]: # list of indices corresponding to accumulation periods
@@ -221,7 +239,7 @@ def getAccs(tnow,accPeriods,dataDir,tmpDir,geotiffDir):
                     if not os.path.exists(outpathNC):
                         os.makedirs(outpathNC)            
                     ds.to_netcdf(path=outfileNC,mode='w', encoding=enc, format='NETCDF4')                 
-                    plot_roa_acc(APIsum,outfileNC.split(".")[0]+".png","API30 [mm]",[-40,-20,33,50],roa_grid,tnowStr)
+                    #plot_roa_acc(APIsum,outfileNC.split(".")[0]+".png","API30 [mm]",[-40,-20,33,50],roa_grid,tnowStr)
 
                     #calculate and save .tiff
                     rasPath = os.path.join(tmpDir,"ROA_precip_API_"+tnowStr+"_SSA.tif")
@@ -275,7 +293,7 @@ if __name__ == '__main__':
         cronFreq=20
         t0 = datetime.datetime.today()
 
-        total_files=glob.glob(os.path.join(dataDir,str(t0.year),str(t0.month).zfill(2),'MSG3*nc'))
+        total_files=glob.glob(os.path.join(dataDir,str(t0.year),str(t0.month).zfill(2),'MSG*nc'))
         for f in total_files:
             modTimesinceEpoc = os.path.getmtime(f)
             modificationTime = datetime.datetime.fromtimestamp(time.mktime(time.localtime(modTimesinceEpoc)))
@@ -314,7 +332,7 @@ if __name__ == '__main__':
             print("start date rounded to nearest interval matching raw data")
             endDate = round_edate
         # get list of dates
-        dateList = generate_dates(startDate,endDate,15)   #SRA EDITED FOR DAILY PROCESSING - CHANGE BACK!!!!!
+        dateList = generate_dates(startDate,endDate,1440)   #SRA EDITED FOR DAILY PROCESSING - CHANGE BACK!!!!!
         new_files = [x.strftime('%Y%m%d%H%M') for x in dateList if reprocess or not os.path.exists(os.path.join(geotiffDir,x.strftime("%Y%m%d"),x.strftime('rainoverAfrica_SSA_%Y%m%d%H%M_acc1h_3857.tif')))]
 
     print(new_files)
