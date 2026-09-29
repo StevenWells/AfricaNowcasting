@@ -73,8 +73,9 @@ if mode=='realtime':
     new_dates = []
     for f in sorted(total_files):
             idate =''.join(os.path.basename(f).split('_')[3:5]).split('.')[0]
-            # has it been pushed to the archive - if not dont process yet
-            if not os.path.exists(os.path.join(CTT_archive,idate[:4],idate[4:6],idate[6:8],'IR_108_BT_'+idate[:8]+'_'+idate[8:12]+'_eumdat.nc')):
+            # has it been made yet - if not dont process yet
+            #if not os.path.exists(os.path.join(CTT_archive,idate[:4],idate[4:6],idate[6:8],'IR_108_BT_'+idate[:8]+'_'+idate[8:12]+'_eumdat.nc')):
+            if not os.path.exists(os.path.join(dataDir,'IR_108_BT_'+idate[:8]+'_'+idate[8:12]+'.nc')):
                 continue
             # has it been processed already?      
             if  os.path.exists(os.path.join(outRoot,idate[:8],'nowcast_cores_unet_'+idate[0:8]+'_'+idate[8:12]+'_'+str(6)+'hr_3857.tif')):
@@ -107,7 +108,8 @@ device = 'cpu' #torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 # TIR data dir
-dir_name = CTT_archive+current_year+'/'
+#dir_name = CTT_archive+current_year+'/'
+dir_name = dataDir
 ##/mnt/scratch/stewells/MSG_NRT/cut/
 
 ###### Define input shape
@@ -144,7 +146,8 @@ dates_of_interest = [to_minus_2hr_date,to_minus_1hr_date,str(current_date)]
 list_of_files = []                
 for l in range(0,len(dates_of_interest),1):
     dates_of_interest_curr = dates_of_interest[l]
-    list_of_files.append(dir_name+dates_of_interest_curr[4:6]+'/'+dates_of_interest_curr[6:8]+'/IR_108_BT_'+dates_of_interest_curr[0:4]+dates_of_interest_curr[4:6]+dates_of_interest_curr[6:8]+'_'+dates_of_interest_curr[8:]+'_eumdat.nc')
+   # list_of_files.append(dir_name+dates_of_interest_curr[4:6]+'/'+dates_of_interest_curr[6:8]+'/IR_108_BT_'+dates_of_interest_curr[0:4]+dates_of_interest_curr[4:6]+dates_of_interest_curr[6:8]+'_'+dates_of_interest_curr[8:]+'_eumdat.nc')
+    list_of_files.append(dir_name+'/IR_108_BT_'+dates_of_interest_curr[0:4]+dates_of_interest_curr[4:6]+dates_of_interest_curr[6:8]+'_'+dates_of_interest_curr[8:]+'.nc')
 
 # check for to-2 file
 if os.path.exists(list_of_files[0]) == False:

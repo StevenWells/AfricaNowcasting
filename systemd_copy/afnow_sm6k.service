@@ -1,8 +1,8 @@
 [Unit]
-Description="Process hi resolution soil mositure data for Nowcasting portal"
+Description="Process 6k soil mositure data for Nowcasting portal"
 
 [Service]
-ExecStart=/home/stewells/AfricaNowcasting/rt_code/run_sm6k_convert.sh
+ExecStart=/home/stewells/AfricaNowcasting/rt_code/afnow_sm6k.sh
 StandardOutput=file:/home/stewells/AfricaNowcasting/logs/afnow_sm6k.output
 StandardError=file:/home/stewells/AfricaNowcasting/logs/afnow_sm6k.error
 Type=oneshot

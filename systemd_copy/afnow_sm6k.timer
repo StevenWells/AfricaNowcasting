@@ -1,5 +1,5 @@
 [Unit]
-Description="Run afnow_sm6k.service every 2 minutes relative to activation time"
+Description="Run afnow_sm6k.service  every 2 minutes relative to activation time"
 
 [Timer]
 OnBootSec=2min
