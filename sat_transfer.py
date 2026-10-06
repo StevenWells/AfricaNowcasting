@@ -290,7 +290,7 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
             "opt_geotiff_ndpls" : 2,
             "extract_riskpt": True,
              "nflics_output_version_portal": 2,
-             "run_risk":True             #
+             "run_risk":False             #
 }   
     if user=="seodey":
         options["code_dir"]="/mnt/users/hymod/seodey/NFLICS/AfricaNowcasting/"
