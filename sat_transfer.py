@@ -387,9 +387,16 @@ def main_code_loop(use_file,mirror_path,shadow_run,db_version,run_offline,backup
 
         if not os.path.exists(savedir):
             os.makedirs(savedir)
+       
+
         else:
             pass
+        # make sure permissions are okay
+        os.system('chmod a+rwx '+os.path.join(rt_save,use_year))
+        os.system('chmod a+rwx '+os.path.join(rt_save,use_year,use_month))
+        os.system('chmod a+rwx '+os.path.join(rt_save,use_year,use_month,use_day))
 
+        
         sfile =use_file[:-3]+'_eumdat.nc' if  options["feed"]=='eumdat' else use_file
 
         print(use_file,sfile)
