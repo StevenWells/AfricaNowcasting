@@ -2,8 +2,9 @@
 Description="Run afnow_ecmwfwind.service every half hour relative to activation time"
 
 [Timer]
-OnBootSec=60min
-OnUnitActiveSec=60min
+#OnBootSec=60min
+#OnUnitActiveSec=60min
+OnCalendar=*-*-* *:00,30:00
 Unit=afnow_ecmwfwind.service
 
 [Install]
