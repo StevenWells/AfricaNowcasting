@@ -23,11 +23,16 @@ tminus_lowerbound = tminus_cutoff - datetime.timedelta(days=40)
 
 
 # EVENTS: list of two-element lists of events, [[start,end],....] to be excluded from purge
-EVENTS = [[datetime.datetime(2026,6,1,0,0),datetime.datetime(2026,6,30,23,45)]]
+EVENTS = [[datetime.datetime(2026,6,1,0,0),datetime.datetime(2026,6,30,23,45)],
+	   [datetime.datetime(2026,8,1,0,0),datetime.datetime(2026,9,30,23,45)]]
 
-
-
-
+if len(sys.argv)==2:
+	if sys.argv[1].lower()=='test':
+		test = True
+	else:
+		test = False
+else:
+	test = False
 # products to be remvoed
 # these names should be the folder names in sanRoot
 ProdsToCull = ['ssa_hsaf_precip','ssa_hsaf_precip_accum',
@@ -38,9 +43,9 @@ for iprod in ProdsToCull:
     ppath = os.path.join(sanRoot,iprod)
     alldirs = sorted([x for x in  glob.glob(ppath+'/*') if (datetime.datetime.strptime(x.split('/')[-1],"%Y%m%d") < tminus_cutoff) and (datetime.datetime.strptime(x.split('/')[-1],"%Y%m%d") > tminus_lowerbound) ])
     # now exclude events that may still fall in that window
-    #print(alldirs)
+    print(alldirs)
     alldirs = [x for x in alldirs if not any([ (datetime.datetime.strptime(x.split('/')[-1],"%Y%m%d") >= e[0]) and (datetime.datetime.strptime(x.split('/')[-1],"%Y%m%d") <= e[1]) for e in EVENTS])]
-    #print(alldirs)
+    print(alldirs)
 
 
     
@@ -52,10 +57,12 @@ for iprod in ProdsToCull:
                 all_files=glob.glob(os.path.join(deldir,'HSAF_precip_acc'+str(acc)+'h*'))
                 for ifile in all_files:
                     print('rm '+ifile)
-                    os.system("rm "+ifile)
+                    if not test:
+                        os.system("rm "+ifile)
         print("need to keep specific files")
     else:
         for idir in alldirs:
             print('rm -r '+idir)
-            os.system('rm -r '+idir)
+            if not test:
+                os.system('rm -r '+idir)
 
